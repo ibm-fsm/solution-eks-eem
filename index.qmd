@@ -1,38 +1,39 @@
-
 ---
-title: "Project Name"
-subtitle: "Subtitle"
+title: "Event Endpoint Management on EKS"
+subtitle: "Pilot Reference Architecture"
 format: html
+date: last-modified
 ---
 ```{=html}
-<span class="dot">SL</span> &ensp;Samuel Lee&ensp;
-```
-```{=html}
-<span class="dot">BK</span> &ensp;Bo Kulbacki&ensp;
+<span class="dot">MD</span> &ensp;Mat Davis&ensp;
 ```
 <br>
 ---
-Description: "Project Name"
+Description: "Reference architecture for deploying IBM Event Endpoint Management (EEM) on Amazon EKS to secure and govern Kafka infrastructure."
 ---
 
 ## The Why
 
-(High-level description of the business challenges and client pain points)
+Enterprises are rapidly adopting Event-Driven Architectures (EDA) to power real-time customer experiences, but their operational maturity can lag behind their REST API ecosystems. While organizations have established rigorous governance, security, and discovery patterns for synchronous APIs (using tools like API-C), their Kafka environments often resemble "wild west" infrastructure.
+
+This disparity creates a critical business risk: critical data streams are exposed without standardized security, discoverability is limited, and onboarding new consumers requires manual, ticket-based friction. This solution bridges that gap by deploying **IBM Event Endpoint Management (EEM)** to treat Events as first-class APIs.
 
 ### Problem Details
 
-Sed elementum convallis quam, sed tempor massa dictum sit amet. Phasellus ultricies ante id massa scelerisque interdum. Vestibulum vitae volutpat felis. Sed metus magna, malesuada vitae odio eu, volutpat aliquam odio. Mauris eget purus ex. Praesent nec gravida lorem. Nam rhoncus bibendum nulla at viverra. Curabitur at diam sem. Pellentesque semper venenatis lorem quis pharetra. Cras venenatis consectetur ante vitae mattis. Etiam in augue vel nunc euismod sodales vitae eu arcu.
+The implementation of Event Management in a secure, cloud-native environment (AWS EKS) presents specific technical and process challenges:
 
-Maecenas tempus ultricies sapien, porta suscipit est facilisis quis. Ut imperdiet massa condimentum sapien lobortis, dictum eleifend enim cursus. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Aenean interdum vel velit non dictum. Suspendisse bibendum neque ut nulla condimentum, quis dictum sem consectetur. Integer quis arcu sem. Sed condimentum dolor sed libero posuere, sed tristique nulla cursus. In hac habitasse platea dictumst. Aenean ullamcorper condimentum risus, at semper tortor consequat eu.
-
-Pellentesque a semper nisl, a vehicula libero. Mauris aliquam porttitor nibh ut porttitor. Praesent eu sem lacinia, volutpat dolor id, interdum enim. Etiam sit amet urna rhoncus, iaculis ex hendrerit, suscipit urna. Duis id porta massa, ac ultrices nulla. Vestibulum ut rutrum lacus, ac vulputate libero. Sed metus massa, maximus ac vulputate nec, lacinia sit amet felis.
-
+* **The "Shadow Kafka" Problem**: Developers cannot discover existing topics, leading to duplicated data streams and lack of reuse. There is no central catalog (portal) for event interfaces.
+* **Inconsistent Security Posture**: Kafka authentication is often handled via static credentials (SASL/SCRAM) or mTLS certificates that are difficult to rotate. There is a need to federate access using corporate Identity Providers (OIDC).
+* **Consumption Friction**: Onboarding a new application to a topic requires manual infrastructure changes (ACLs, firewall rules), slowing down innovation cycles.
+* **Deployment Complexity**: Deploying the EEM Gateway and Manager on EKS requires navigating complex ingress patterns, including AWS Network Load Balancers (NLB), Ingress Controllers, and strictly enforcing TLS/SSL requirements using enterprise CAs.
 
 ### Additional Context
 
-Sed elementum convallis quam, sed tempor massa dictum sit amet. Phasellus ultricies ante id massa scelerisque interdum. Vestibulum vitae volutpat felis. Sed metus magna, malesuada vitae odio eu, volutpat aliquam odio. Mauris eget purus ex. Praesent nec gravida lorem. Nam rhoncus bibendum nulla at viverra. Curabitur at diam sem. Pellentesque semper venenatis lorem quis pharetra. Cras venenatis consectetur ante vitae mattis. Etiam in augue vel nunc euismod sodales vitae eu arcu.
+**Environment & Constraints**
 
-Maecenas tempus ultricies sapien, porta suscipit est facilisis quis. Ut imperdiet massa condimentum sapien lobortis, dictum eleifend enim cursus. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Aenean interdum vel velit non dictum. Suspendisse bibendum neque ut nulla condimentum, quis dictum sem consectetur. Integer quis arcu sem. Sed condimentum dolor sed libero posuere, sed tristique nulla cursus. In hac habitasse platea dictumst. Aenean ullamcorper condimentum risus, at semper tortor consequat eu.
-
-Pellentesque a semper nisl, a vehicula libero. Mauris aliquam porttitor nibh ut porttitor. Praesent eu sem lacinia, volutpat dolor id, interdum enim. Etiam sit amet urna rhoncus, iaculis ex hendrerit, suscipit urna. Duis id porta massa, ac ultrices nulla. Vestibulum ut rutrum lacus, ac vulputate libero. Sed metus massa, maximus ac vulputate nec, lacinia sit amet felis.
-
+*   **Platform:** AWS Elastic Kubernetes Service (EKS).
+    *   **Kubernetes Version:** Kubernetes platforms that support the Red Hat Universal Base Images (UBI) containers, versions 1.27 to 1.33.
+*   **Software Version:** IBM EEM 11.7.1 (Helm Chart 11.7.1).
+*   **Identity Provider:** OpenID Connect (e.g. Keycloak).
+*   **Ingress Controller:** NGINX or similiar with SSL Passthrough.
+*   **Certificate Management:** cert-manager v1.19.2 or similiar.

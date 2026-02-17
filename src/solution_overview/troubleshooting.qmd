@@ -1,6 +1,9 @@
 ---
-title: "Step Three"
+title: "Troubleshooting & Diagnostics"
 format: html
+date: last-modified
 ---
-
-### Step Three Solution
+```{=html}
+<span class="dot">MD</span> &ensp;Mat Davis&ensp;
+```
+<br>

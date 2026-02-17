@@ -3,14 +3,12 @@ title: "Event Endpoint Management on EKS"
 subtitle: "Pilot Reference Architecture"
 format: html
 date: last-modified
+description: "Reference architecture for deploying IBM Event Endpoint Management (EEM) on Amazon EKS to secure and govern Kafka infrastructure."
 ---
 ```{=html}
-<span class="dot">MD</span> &ensp;Mat Davis&ensp;
+<span class="dot">MD</span> &ensp;<a href="https://github.com/doormat18/">Mat Davis</a>&ensp;
 ```
 <br>
----
-Description: "Reference architecture for deploying IBM Event Endpoint Management (EEM) on Amazon EKS to secure and govern Kafka infrastructure."
----
 
 ## The Why
 

@@ -1,9 +1,0 @@
----
-title: "Troubleshooting & Diagnostics"
-format: html
-date: last-modified
----
-```{=html}
-<span class="dot">MD</span> &ensp;Mat Davis&ensp;
-```
-<br>

@@ -50,16 +50,6 @@
     ]
   },
   {
-    "objectID": "index.html#description-reference-architecture-for-deploying-ibm-event-endpoint-management-eem-on-amazon-eks-to-secure-and-govern-kafka-infrastructure.",
-    "href": "index.html#description-reference-architecture-for-deploying-ibm-event-endpoint-management-eem-on-amazon-eks-to-secure-and-govern-kafka-infrastructure.",
-    "title": "Event Endpoint Management on EKS",
-    "section": "Description: “Reference architecture for deploying IBM Event Endpoint Management (EEM) on Amazon EKS to secure and govern Kafka infrastructure.”",
-    "text": "Description: “Reference architecture for deploying IBM Event Endpoint Management (EEM) on Amazon EKS to secure and govern Kafka infrastructure.”",
-    "crumbs": [
-      "Problem Definition"
-    ]
-  },
-  {
     "objectID": "index.html#the-why",
     "href": "index.html#the-why",
     "title": "Event Endpoint Management on EKS",

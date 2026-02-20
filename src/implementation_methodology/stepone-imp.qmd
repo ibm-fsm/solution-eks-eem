@@ -78,7 +78,7 @@ helm repo update
 helm install nginx-ingress ingress-nginx/ingress-nginx \
   --namespace ingress-nginx \
   --create-namespace \
---set controller.kind=DaemonSet \
+  --set controller.kind=DaemonSet \
   --set controller.service.type=LoadBalancer \
   --set controller.publishService.enabled=true \
   --set controller.extraArgs.enable-ssl-passthrough=true \

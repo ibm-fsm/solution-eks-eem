@@ -21,7 +21,7 @@ helm repo add ibm-helm https://raw.githubusercontent.com/IBM/charts/master/repo/
 # 2. Update to ensure you have the latest chart versions
 helm repo update
 
-# 3. Verify the chart is available (Target: 11.1.7+)
+# 3. Verify the chart is available (Target: 11.7.1+)
 helm search repo ibm-eem-operator
 ```
 
@@ -35,7 +35,7 @@ The EEM Operator manages the lifecycle of the Manager, Gateway, and Portal compo
 helm install eem-crds ibm-helm/ibm-eem-operator-crd \
   --namespace ibm-eem \
   --create-namespace \
-  --version 11.1.7
+  --version 11.7.1
 ```
 
 **Step 2: Install the Operator**
@@ -43,7 +43,7 @@ helm install eem-crds ibm-helm/ibm-eem-operator-crd \
 ```bash
 helm install eem-operator ibm-helm/ibm-eem-operator \
   --namespace ibm-eem \
-  --version 11.1.7 \
+  --version 11.7.1 \
   --set webhook.create=true \
   --set watchAnyNamespace=false
 ```
@@ -59,25 +59,9 @@ kubectl get deploy ibm-eem-operator -n ibm-eem
 
 ### 2.3 Create Security Assets
 
-EEM requires several Kubernetes secrets to be pre-provisioned for image pulling, OIDC authentication, and TLS trust.
+EEM requires several Kubernetes secrets to be pre-provisioned for OIDC authentication and TLS trust.
 
-#### 1. Image Pull Secret
-Create the secret using your IBM Entitlement Key to authorize pulling images from `cp.icr.io`.
-
-```bash
-# Replace with your actual entitlement key
-export IBM_ENTITLEMENT_KEY="yourentitlementkey"
-
-kubectl create secret docker-registry ibm-entitlement-key \
-  --namespace ibm-eem \
-  --docker-username=cp \
-  --docker-password=$IBM_ENTITLEMENT_KEY \
-  --docker-server="cp.icr.io"
-
-unset IBM_ENTITLEMENT_KEY
-```
-
-#### 2. OIDC Client Secret
+#### 1. OIDC Client Secret
 This secret contains the credentials for your Identity Provider (Keycloak).
 
 ```bash
@@ -88,7 +72,7 @@ kubectl create secret generic oidc-client-secret \
   --from-literal=client-secret='your-client-secret'
 ```
 
-#### 3. OIDC Trust Secret (Self-Signed Only)
+#### 2. OIDC Trust Secret (Self-Signed Only)
 If your Keycloak instance uses a self-signed certificate (common in labs), you must export its CA cert and mount it into EEM.
 
 ```bash
@@ -145,7 +129,7 @@ spec:
         clientSecretKey: client-secret
         discovery: true
         secretName: oidc-client-secret
-        site: 'https://keycloak.eem.corp/realms/eem-portal'
+        site: 'https://keycloak.eem.corp/realms/ibm-eem'
     # Mount the custom CA cert to trust Keycloak
     tls:
       trustedCertificates:
@@ -256,5 +240,7 @@ kubectl patch secret eem-manager-ibm-eem-user-roles \
 
 :::{.callout-tip}
 ### Verification
-Navigate to `https://eem-portal.gym.lan` (or your configured host). Log in with your Keycloak credentials. You should see the **Administration** menu item, confirming that the role mapping was successful.
+Navigate to `https://eem-portal.gym.lan` (or your configured host). Log in with your Keycloak credentials. You should see the **Administration** and **Manage** menu items, confirming that the role mapping was successful.  
+
+**Note:** The role mapping might take a few minutes to propagate. If you see an "Unauthorized" message, wait a moment and refresh.
 :::

@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2026-02-20">
+<meta name="dcterms.date" content="2026-02-24">
 
 <title>Deployment Readiness – EEM on EKS</title>
 <style>
@@ -284,7 +284,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">February 20, 2026</p>
+      <p class="date">February 24, 2026</p>
     </div>
   </div>
   
@@ -323,6 +323,19 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <div class="callout-body-container callout-body">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 <span class="kw">|</span> <span class="fu">bash</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Skopeo install on Linux (RHEL 8):
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> dnf <span class="at">-y</span> install skopeo</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </div>
 </section>
@@ -365,7 +378,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="supply-chain-image-mirroring" class="level3">
 <h3 class="anchored" data-anchor-id="supply-chain-image-mirroring">4. Supply Chain (Image Mirroring)</h3>
-<p>The target environment prohibits direct access to public registries (<code>cp.icr.io</code>). All container images must be staged in the client’s internal trusted registry (e.g., Artifactory).</p>
+<p>The target environment prohibits direct access to public registries (<code>cp.icr.io</code>, <code>icr.io</code>). All container images must be staged in the internal trusted registry (e.g., Artifactory).</p>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -379,10 +392,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>You will need an IBM entitlement key to mirror the images or install without mirroring. This can be obtained <a href="https://myibm.ibm.com/products-services/containerlibrary">here</a>.</p>
 </div>
 </div>
-<p><strong>Enterprise Pipeline Integration</strong> If the organization utilizes a centralized image ingestion process, please configure the pipeline to pull from the <strong>IBM Entitled Registry</strong>.</p>
+<p><strong>Enterprise Pipeline Integration</strong> If the organization utilizes a centralized image ingestion process, please configure the pipeline to pull from both the <strong>IBM Entitled Registry</strong> and the <strong>IBM Open Registry</strong>.</p>
 <ul>
-<li><strong>Source Registry:</strong> <code>cp.icr.io</code></li>
-<li><strong>Source Namespace:</strong> <code>cp/ibm-eventendpointmanagement</code></li>
+<li><strong>Source Registries:</strong> <code>cp.icr.io</code>, <code>icr.io</code></li>
+<li><strong>Source Namespaces:</strong> <code>cp/ibm-eventendpointmanagement</code>, <code>cpopen/ibm-eventendpointmanagement</code>, <code>cpopen</code></li>
 </ul>
 <p><strong>Core Images:</strong></p>
 <table class="caption-top table">
@@ -407,7 +420,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="odd">
 <td style="text-align: left;"><strong>Gateway</strong></td>
-<td style="text-align: left;"><code>cp.icr.io/cp/ibm-eventendpointmanagement/eim-gateway</code></td>
+<td style="text-align: left;"><code>icr.io/cpopen/ibm-eventendpointmanagement/egw</code></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Gateway Tutorial</strong></td>
+<td style="text-align: left;"><code>icr.io/cpopen/ibm-eventendpointmanagement/egw-tutorial</code></td>
 </tr>
 </tbody>
 </table>
@@ -417,11 +434,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Tip</span>Finding Tags
+<span class="screen-reader-only">Tip</span>Finding Exact Tags and Digests
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>To find the exact tags for a specific version, you can use <code>skopeo list-tags</code> against the repository using your entitlement key, or refer to the specific CASE bundle for your version of the operator.</p>
+<p>Because IBM utilizes <code>sha256</code> digests rather than standard version tags to guarantee image immutability, guessing tags or using <code>skopeo list-tags</code> can lead to <code>manifest unknown</code> errors (especially with single-architecture vs.&nbsp;multi-architecture index files).</p>
+<p>The most reliable way to get the exact paths and digests for your specific deployment is to extract them directly from the Helm chart:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Pull and unpack the specific version of the chart</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">helm</span> pull ibm-helm/ibm-eem-operator <span class="at">--version</span> <span class="op">&lt;</span>VERSION<span class="op">&gt;</span> --untar</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Extract every image reference and digest used by the operator</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="ex">helm</span> template dummy-release ./ibm-eem-operator <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-iE</span> <span class="st">'image:|value:.*icr\.io'</span> <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-u</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Use the output from this command to feed your mirroring tools (like <code>skopeo copy</code>), appending <code>--preserve-digests</code> to ensure the hashes remain identical in your local registry.</p>
 </div>
 </div>
 </section>

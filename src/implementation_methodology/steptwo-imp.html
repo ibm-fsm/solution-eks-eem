@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2026-02-20">
+<meta name="dcterms.date" content="2026-02-24">
 
 <title>Phase 2: EEM Deployment – EEM on EKS</title>
 <style>
@@ -280,7 +280,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">February 20, 2026</p>
+      <p class="date">February 24, 2026</p>
     </div>
   </div>
   
@@ -311,16 +311,78 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h3 class="anchored" data-anchor-id="install-the-eem-operator">2.2 Install the EEM Operator</h3>
 <p>The EEM Operator manages the lifecycle of the Manager, Gateway, and Portal components.</p>
 <p><strong>Step 1: Install Custom Resource Definitions (CRDs)</strong></p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">helm</span> install eem-crds ibm-helm/ibm-eem-operator-crd <span class="dt">\</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--create-namespace</span> <span class="dt">\</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--version</span> 11.7.1</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><strong>Step 2: Install the Operator</strong></p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">helm</span> install eem-operator ibm-helm/ibm-eem-operator <span class="dt">\</span></span>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true" href="">Option A: Air-Gapped (Direct Download)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false" href="">Option B: Connected (Direct Install)</a></li></ul>
+<div class="tab-content">
+<div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
+<p><strong>Target:</strong> Restricted / Production</p>
+<p>If your cluster cannot reach the public Helm repositories directly, download the chart archive using <code>curl</code> and install it from the local file.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Download the chart archive</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-LO</span> https://raw.githubusercontent.com/IBM/charts/master/repo/ibm-helm/ibm-eem-operator-crd-11.7.1.tgz</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Install from the local file</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="ex">helm</span> install eem-crds ./ibm-eem-operator-crd-11.7.1.tgz <span class="dt">\</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">--create-namespace</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
+<p><strong>Target:</strong> Sandbox / POC with Internet Access</p>
+<p>If your environment has outbound internet access, install directly from the IBM Helm repository.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">helm</span> install eem-crds ibm-helm/ibm-eem-operator-crd <span class="dt">\</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--version</span> 11.7.1 <span class="dt">\</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--set</span> webhook.create=true <span class="dt">\</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">--set</span> watchAnyNamespace=false</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--create-namespace</span> <span class="dt">\</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--version</span> 11.7.1</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+</div>
+<p><strong>Step 2: Install the Operator</strong></p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" role="tab" aria-controls="tabset-2-1" aria-selected="true" href="">Option A: Air-Gapped (Local Configuration)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" role="tab" aria-controls="tabset-2-2" aria-selected="false" href="">Option B: Connected (Direct Install)</a></li></ul>
+<div class="tab-content">
+<div id="tabset-2-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-2-1-tab">
+<p><strong>Target:</strong> Restricted / Production</p>
+<p>If pulling images from an internal Artifactory, you must download the chart, extract it, and modify the <code>values.yaml</code> file to point the operator to your local registry.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Download the chart archive</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-LO</span> https://raw.githubusercontent.com/IBM/charts/master/repo/ibm-helm/ibm-eem-operator-11.7.1.tgz</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Extract the archive</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="fu">tar</span> <span class="at">-xzf</span> ibm-eem-operator-11.7.1.tgz</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Configure Local Registry Paths:</strong> Open <code>ibm-eem-operator/values.yaml</code> in your preferred text editor.</p>
+<ol type="1">
+<li>Locate the <code>public</code> and <code>private</code> repository blocks at the top of the file and replace the IBM registry URLs with your internal Artifactory path.</li>
+<li>In the <code>images</code> block, replace the strict <code>@sha256:...</code> digests with the standard version tag (e.g., <code>:11.7.1</code>).</li>
+<li>If your Artifactory is configured for anonymous access, clear the <code>operatorImagePullSecret</code> value so the cluster does not attempt to authenticate.</li>
+</ol>
+<p><em>Example configuration using a local lab Artifactory:</em></p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">public</span><span class="kw">:</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">repo</span><span class="kw">:</span><span class="at"> artifactory.gym.lan:8443</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">path</span><span class="kw">:</span><span class="at"> docker-local/ibm-eventendpointmanagement/</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="fu">private</span><span class="kw">:</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">repo</span><span class="kw">:</span><span class="at"> artifactory.gym.lan:8443</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">path</span><span class="kw">:</span><span class="at"> docker-local/ibm-eventendpointmanagement/</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="fu">images</span><span class="kw">:</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">operator</span><span class="kw">:</span><span class="at"> ibm-eventendpointmanagement-operator:11.7.1</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">eemManager</span><span class="kw">:</span><span class="at"> eim-backend:11.7.1</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">egw</span><span class="kw">:</span><span class="at"> ibm-eventendpointmanagement/egw:11.7.1</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">tutorialegw</span><span class="kw">:</span><span class="at"> egw-tutorial:11.7.1</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Clear this value if your registry allows anonymous pulls</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="fu">operatorImagePullSecret</span><span class="kw">:</span><span class="at"> </span><span class="st">""</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Install the Operator:</strong> Once your values are saved, run the install command against the local directory.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Install from the local extracted directory</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">helm</span> install eem-operator ./ibm-eem-operator <span class="dt">\</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="tabset-2-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-2-2-tab">
+<p><strong>Target:</strong> Sandbox / POC with Internet Access</p>
+<p>If your environment has outbound internet access, install directly from the IBM Helm repository.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">helm</span> install eem-operator ibm-helm/ibm-eem-operator <span class="dt">\</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--version</span> 11.7.1</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+</div>
 <div class="callout callout-style-default callout-tip callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -332,8 +394,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <div class="callout-body-container callout-body">
 <p>Verify the operator is running before proceeding.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> get deploy ibm-eem-operator <span class="at">-n</span> ibm-eem</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Expected: 1/1 READY</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> get deploy ibm-eem-operator <span class="at">-n</span> ibm-eem</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Expected: 1/1 READY</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </div>
 </section>
@@ -343,119 +405,287 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="oidc-client-secret" class="level4">
 <h4 class="anchored" data-anchor-id="oidc-client-secret">1. OIDC Client Secret</h4>
 <p>This secret contains the credentials for your Identity Provider (Keycloak).</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Replace 'your-client-secret' with the value from Keycloak</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> create secret generic oidc-client-secret <span class="dt">\</span></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--from-literal</span><span class="op">=</span>client-id=<span class="st">'eem-portal'</span> <span class="dt">\</span></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">--from-literal</span><span class="op">=</span>client-secret=<span class="st">'your-client-secret'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Replace 'your-client-secret' with the value from Keycloak</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> create secret generic oidc-client-secret <span class="dt">\</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--from-literal</span><span class="op">=</span>client-id=<span class="st">'eem-portal'</span> <span class="dt">\</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">--from-literal</span><span class="op">=</span>client-secret=<span class="st">'your-client-secret'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="oidc-trust-secret-self-signed-only" class="level4">
 <h4 class="anchored" data-anchor-id="oidc-trust-secret-self-signed-only">2. OIDC Trust Secret (Self-Signed Only)</h4>
 <p>If your Keycloak instance uses a self-signed certificate (common in labs), you must export its CA cert and mount it into EEM.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Download the cert from the Keycloak endpoint</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="kw">|</span> <span class="ex">openssl</span> s_client <span class="dt">\</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-showcerts</span> <span class="dt">\</span></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">-servername</span> keycloak.my-haproxy.gym.lan <span class="dt">\</span></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">-connect</span> keycloak.my-haproxy.gym.lan:443 <span class="dv">2</span><span class="op">&gt;</span>/dev/null <span class="kw">|</span> <span class="dt">\</span></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="ex">openssl</span> x509 <span class="at">-outform</span> PEM <span class="op">&gt;</span> keycloak.pem</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Create the trust secret</span></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> create secret generic keycloak-trust-secret <span class="dt">\</span></span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">--from-file</span><span class="op">=</span>ca.crt=keycloak.pem</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Download the cert from the Keycloak endpoint</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="kw">|</span> <span class="ex">openssl</span> s_client <span class="dt">\</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-showcerts</span> <span class="dt">\</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">-servername</span> keycloak.my-haproxy.gym.lan <span class="dt">\</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">-connect</span> keycloak.my-haproxy.gym.lan:443 <span class="dv">2</span><span class="op">&gt;</span>/dev/null <span class="kw">|</span> <span class="dt">\</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="ex">openssl</span> x509 <span class="at">-outform</span> PEM <span class="op">&gt;</span> keycloak.pem</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Create the trust secret</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> create secret generic keycloak-trust-secret <span class="dt">\</span></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">--from-file</span><span class="op">=</span>ca.crt=keycloak.pem</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 </section>
 <section id="deploy-the-eem-instance" class="level3">
 <h3 class="anchored" data-anchor-id="deploy-the-eem-instance">2.4 Deploy the EEM Instance</h3>
 <p>We use a Custom Resource (CR) to define the EEM instance. Select the configuration that matches your environment.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true" href="">Option A: Production (Generic)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false" href="">Option B: Lab (Self-Signed)</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" role="tab" aria-controls="tabset-3-1" aria-selected="true" href="">Option A: Production (Generic)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-3-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-2" role="tab" aria-controls="tabset-3-2" aria-selected="false" href="">Option B: Lab (Self-Signed)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-3-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-3" role="tab" aria-controls="tabset-3-3" aria-selected="false" href="">Option C: AWS EKS (Local Auth)</a></li></ul>
 <div class="tab-content">
-<div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
-<p><strong>Use Case:</strong> Standard deployment with valid CA-signed certificates.</p>
-<p>Create a file named <code>eem-instance-prod.yaml</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> events.ibm.com/v1beta1</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> EventEndpointManagement</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> eem-manager</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">namespace</span><span class="kw">:</span><span class="at"> ibm-eem</span></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">license</span><span class="kw">:</span></span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">accept</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">license</span><span class="kw">:</span><span class="at"> </span><span class="st">'L-CYBH-K48BZQ'</span></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">metric</span><span class="kw">:</span><span class="at"> VIRTUAL_PROCESSOR_CORE</span></span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">use</span><span class="kw">:</span><span class="at"> EventAutomationProduction</span></span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">manager</span><span class="kw">:</span></span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">endpoints</span><span class="kw">:</span></span>
-<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> ui</span></span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> portal.eem.corp</span></span>
-<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> gateway</span></span>
-<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> gateway.eem.corp</span></span>
-<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> admin</span></span>
-<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> admin.eem.corp</span></span>
-<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> server</span></span>
-<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> server.eem.corp</span></span>
-<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">authConfig</span><span class="kw">:</span></span>
-<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">authType</span><span class="kw">:</span><span class="at"> OIDC</span></span>
-<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">oidcConfig</span><span class="kw">:</span></span>
-<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">clientIDKey</span><span class="kw">:</span><span class="at"> client-id</span></span>
-<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">clientSecretKey</span><span class="kw">:</span><span class="at"> client-secret</span></span>
-<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">discovery</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
-<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">secretName</span><span class="kw">:</span><span class="at"> oidc-client-secret</span></span>
-<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">site</span><span class="kw">:</span><span class="at"> </span><span class="st">'https://keycloak.eem.corp/realms/ibm-eem'</span></span>
-<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a><span class="co">    # Mount the custom CA cert to trust Keycloak</span></span>
-<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">tls</span><span class="kw">:</span></span>
-<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">trustedCertificates</span><span class="kw">:</span></span>
-<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">certificate</span><span class="kw">:</span><span class="at"> ca.crt</span></span>
-<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">secretName</span><span class="kw">:</span><span class="at"> keycloak-trust-secret</span></span>
-<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">storage</span><span class="kw">:</span></span>
-<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">storageClassName</span><span class="kw">:</span><span class="at"> gp3</span></span>
-<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">type</span><span class="kw">:</span><span class="at"> persistent-claim</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="tabset-3-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-3-1-tab">
+<p><strong>Use Case:</strong> Standard deployment with valid CA-signed certificates and OIDC authentication.</p>
+<p>Create a file named <code>eem-instance.yaml</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> events.ibm.com/v1beta1</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> EventEndpointManagement</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> eem-manager</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">namespace</span><span class="kw">:</span><span class="at"> ibm-eem</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">license</span><span class="kw">:</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">accept</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">license</span><span class="kw">:</span><span class="at"> </span><span class="st">'L-CYBH-K48BZQ'</span></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">metric</span><span class="kw">:</span><span class="at"> VIRTUAL_PROCESSOR_CORE</span></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">use</span><span class="kw">:</span><span class="at"> EventAutomationProduction</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">manager</span><span class="kw">:</span></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">endpoints</span><span class="kw">:</span></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> ui</span></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> eem-portal.corp</span></span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a><span class="co">          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.</span></span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">external-dns.alpha.kubernetes.io/ttl</span><span class="kw">:</span><span class="at"> </span><span class="st">"300"</span></span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"alb"</span></span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/healthcheck-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/subnets</span><span class="kw">:</span><span class="at"> </span><span class="st">"subnet-xxxx, subnet-yyyy, subnet-zzzz"</span></span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/security-groups</span><span class="kw">:</span><span class="at"> </span><span class="st">"eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"</span></span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/tags</span><span class="kw">:</span><span class="at"> </span><span class="st">"Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"</span></span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> gateway</span></span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> eem-gateway.corp</span></span>
+<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb11-30"><a href="#cb11-30" aria-hidden="true" tabindex="-1"></a><span class="co">          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.</span></span>
+<span id="cb11-31"><a href="#cb11-31" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">external-dns.alpha.kubernetes.io/ttl</span><span class="kw">:</span><span class="at"> </span><span class="st">"300"</span></span>
+<span id="cb11-32"><a href="#cb11-32" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"alb"</span></span>
+<span id="cb11-33"><a href="#cb11-33" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
+<span id="cb11-34"><a href="#cb11-34" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
+<span id="cb11-35"><a href="#cb11-35" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/healthcheck-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb11-36"><a href="#cb11-36" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb11-37"><a href="#cb11-37" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/subnets</span><span class="kw">:</span><span class="at"> </span><span class="st">"subnet-xxxx, subnet-yyyy, subnet-zzzz"</span></span>
+<span id="cb11-38"><a href="#cb11-38" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/security-groups</span><span class="kw">:</span><span class="at"> </span><span class="st">"eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"</span></span>
+<span id="cb11-39"><a href="#cb11-39" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/tags</span><span class="kw">:</span><span class="at"> </span><span class="st">"Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"</span></span>
+<span id="cb11-40"><a href="#cb11-40" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> admin</span></span>
+<span id="cb11-41"><a href="#cb11-41" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> eem-admin.corp</span></span>
+<span id="cb11-42"><a href="#cb11-42" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb11-43"><a href="#cb11-43" aria-hidden="true" tabindex="-1"></a><span class="co">          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.</span></span>
+<span id="cb11-44"><a href="#cb11-44" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">external-dns.alpha.kubernetes.io/ttl</span><span class="kw">:</span><span class="at"> </span><span class="st">"300"</span></span>
+<span id="cb11-45"><a href="#cb11-45" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"alb"</span></span>
+<span id="cb11-46"><a href="#cb11-46" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
+<span id="cb11-47"><a href="#cb11-47" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
+<span id="cb11-48"><a href="#cb11-48" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/healthcheck-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb11-49"><a href="#cb11-49" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb11-50"><a href="#cb11-50" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/subnets</span><span class="kw">:</span><span class="at"> </span><span class="st">"subnet-xxxx, subnet-yyyy, subnet-zzzz"</span></span>
+<span id="cb11-51"><a href="#cb11-51" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/security-groups</span><span class="kw">:</span><span class="at"> </span><span class="st">"eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"</span></span>
+<span id="cb11-52"><a href="#cb11-52" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/tags</span><span class="kw">:</span><span class="at"> </span><span class="st">"Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"</span></span>
+<span id="cb11-53"><a href="#cb11-53" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> server</span></span>
+<span id="cb11-54"><a href="#cb11-54" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> eem.server.corp</span></span>
+<span id="cb11-55"><a href="#cb11-55" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb11-56"><a href="#cb11-56" aria-hidden="true" tabindex="-1"></a><span class="co">          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.</span></span>
+<span id="cb11-57"><a href="#cb11-57" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">external-dns.alpha.kubernetes.io/ttl</span><span class="kw">:</span><span class="at"> </span><span class="st">"300"</span></span>
+<span id="cb11-58"><a href="#cb11-58" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"alb"</span></span>
+<span id="cb11-59"><a href="#cb11-59" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
+<span id="cb11-60"><a href="#cb11-60" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
+<span id="cb11-61"><a href="#cb11-61" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/healthcheck-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb11-62"><a href="#cb11-62" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb11-63"><a href="#cb11-63" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/subnets</span><span class="kw">:</span><span class="at"> </span><span class="st">"subnet-xxxx, subnet-yyyy, subnet-zzzz"</span></span>
+<span id="cb11-64"><a href="#cb11-64" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/security-groups</span><span class="kw">:</span><span class="at"> </span><span class="st">"eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"</span></span>
+<span id="cb11-65"><a href="#cb11-65" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/tags</span><span class="kw">:</span><span class="at"> </span><span class="st">"Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"</span></span>
+<span id="cb11-66"><a href="#cb11-66" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">authConfig</span><span class="kw">:</span></span>
+<span id="cb11-67"><a href="#cb11-67" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">authType</span><span class="kw">:</span><span class="at"> OIDC</span></span>
+<span id="cb11-68"><a href="#cb11-68" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">oidcConfig</span><span class="kw">:</span></span>
+<span id="cb11-69"><a href="#cb11-69" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">clientIDKey</span><span class="kw">:</span><span class="at"> client-id</span></span>
+<span id="cb11-70"><a href="#cb11-70" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">clientSecretKey</span><span class="kw">:</span><span class="at"> client-secret</span></span>
+<span id="cb11-71"><a href="#cb11-71" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">discovery</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb11-72"><a href="#cb11-72" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">secretName</span><span class="kw">:</span><span class="at"> oidc-client-secret</span></span>
+<span id="cb11-73"><a href="#cb11-73" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">site</span><span class="kw">:</span><span class="at"> </span><span class="st">'https://keycloak.corp/realms/ibm-eem'</span></span>
+<span id="cb11-74"><a href="#cb11-74" aria-hidden="true" tabindex="-1"></a><span class="co">    # Mount the custom CA cert to trust Keycloak</span></span>
+<span id="cb11-75"><a href="#cb11-75" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">tls</span><span class="kw">:</span></span>
+<span id="cb11-76"><a href="#cb11-76" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">trustedCertificates</span><span class="kw">:</span></span>
+<span id="cb11-77"><a href="#cb11-77" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">certificate</span><span class="kw">:</span><span class="at"> ca.crt</span></span>
+<span id="cb11-78"><a href="#cb11-78" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">secretName</span><span class="kw">:</span><span class="at"> keycloak-trust-secret</span></span>
+<span id="cb11-79"><a href="#cb11-79" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">storage</span><span class="kw">:</span></span>
+<span id="cb11-80"><a href="#cb11-80" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">storageClassName</span><span class="kw">:</span><span class="at"> gp2</span></span>
+<span id="cb11-81"><a href="#cb11-81" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">type</span><span class="kw">:</span><span class="at"> persistent-claim</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><strong>Apply the Configuration:</strong></p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> apply <span class="at">-f</span> eem-instance-prod.yaml</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> apply <span class="at">-f</span> eem-instance.yaml</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
-<p><strong>Use Case:</strong> Lab environment needing custom trust anchors and local storage.</p>
-<p>Create a file named <code>eem-instance-lab.yaml</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> events.ibm.com/v1beta1</span></span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> EventEndpointManagement</span></span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> eem-manager</span></span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">namespace</span><span class="kw">:</span><span class="at"> ibm-eem</span></span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">license</span><span class="kw">:</span></span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">accept</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">license</span><span class="kw">:</span><span class="at"> </span><span class="st">'L-CYBH-K48BZQ'</span></span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">metric</span><span class="kw">:</span><span class="at"> VIRTUAL_PROCESSOR_CORE</span></span>
-<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">use</span><span class="kw">:</span><span class="at"> EventAutomationProduction</span></span>
-<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">manager</span><span class="kw">:</span></span>
-<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">endpoints</span><span class="kw">:</span></span>
-<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> ui</span></span>
-<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> eem-portal.gym.lan</span></span>
-<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> gateway</span></span>
-<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> eem-gateway.gym.lan</span></span>
-<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> admin</span></span>
-<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> eem-admin.gym.lan</span></span>
-<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> server</span></span>
-<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> eem.eem-server.gym.lan</span></span>
-<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">authConfig</span><span class="kw">:</span></span>
-<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">authType</span><span class="kw">:</span><span class="at"> OIDC</span></span>
-<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">oidcConfig</span><span class="kw">:</span></span>
-<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">clientIDKey</span><span class="kw">:</span><span class="at"> client-id</span></span>
-<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">clientSecretKey</span><span class="kw">:</span><span class="at"> client-secret</span></span>
-<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">discovery</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
-<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">secretName</span><span class="kw">:</span><span class="at"> oidc-client-secret</span></span>
-<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">site</span><span class="kw">:</span><span class="at"> </span><span class="st">'https://keycloak.my-haproxy.gym.lan/realms/eem-portal'</span></span>
-<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a><span class="co">    # Mount the custom CA cert to trust Keycloak</span></span>
-<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">tls</span><span class="kw">:</span></span>
-<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">trustedCertificates</span><span class="kw">:</span></span>
-<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">certificate</span><span class="kw">:</span><span class="at"> ca.crt</span></span>
-<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">secretName</span><span class="kw">:</span><span class="at"> keycloak-trust-secret</span></span>
-<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">storage</span><span class="kw">:</span></span>
-<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">storageClassName</span><span class="kw">:</span><span class="at"> local-path</span></span>
-<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">type</span><span class="kw">:</span><span class="at"> persistent-claim</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="tabset-3-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-3-2-tab">
+<p><strong>Use Case:</strong> Lab environment needing custom trust anchors, local storage, and OIDC.</p>
+<p>Create a file named <code>eem-instance.yaml</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> events.ibm.com/v1beta1</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> EventEndpointManagement</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> eem-manager</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">namespace</span><span class="kw">:</span><span class="at"> ibm-eem</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">license</span><span class="kw">:</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">accept</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">license</span><span class="kw">:</span><span class="at"> </span><span class="st">'L-CYBH-K48BZQ'</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">metric</span><span class="kw">:</span><span class="at"> VIRTUAL_PROCESSOR_CORE</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">use</span><span class="kw">:</span><span class="at"> EventAutomationProduction</span></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">manager</span><span class="kw">:</span></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">endpoints</span><span class="kw">:</span></span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> ui</span></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> eem-portal.gym.lan</span></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a><span class="co">          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.</span></span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">external-dns.alpha.kubernetes.io/ttl</span><span class="kw">:</span><span class="at"> </span><span class="st">"300"</span></span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"nginx"</span></span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">nginx.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/healthcheck-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/subnets</span><span class="kw">:</span><span class="at"> </span><span class="st">"subnet-xxxx, subnet-yyyy, subnet-zzzz"</span></span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/security-groups</span><span class="kw">:</span><span class="at"> </span><span class="st">"eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"</span></span>
+<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/tags</span><span class="kw">:</span><span class="at"> </span><span class="st">"Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"</span></span>
+<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> gateway</span></span>
+<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> eem-gateway.gym.lan</span></span>
+<span id="cb13-30"><a href="#cb13-30" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb13-31"><a href="#cb13-31" aria-hidden="true" tabindex="-1"></a><span class="co">          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.</span></span>
+<span id="cb13-32"><a href="#cb13-32" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">external-dns.alpha.kubernetes.io/ttl</span><span class="kw">:</span><span class="at"> </span><span class="st">"300"</span></span>
+<span id="cb13-33"><a href="#cb13-33" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"nginx"</span></span>
+<span id="cb13-34"><a href="#cb13-34" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">nginx.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb13-35"><a href="#cb13-35" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
+<span id="cb13-36"><a href="#cb13-36" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
+<span id="cb13-37"><a href="#cb13-37" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/healthcheck-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb13-38"><a href="#cb13-38" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb13-39"><a href="#cb13-39" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/subnets</span><span class="kw">:</span><span class="at"> </span><span class="st">"subnet-xxxx, subnet-yyyy, subnet-zzzz"</span></span>
+<span id="cb13-40"><a href="#cb13-40" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/security-groups</span><span class="kw">:</span><span class="at"> </span><span class="st">"eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"</span></span>
+<span id="cb13-41"><a href="#cb13-41" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/tags</span><span class="kw">:</span><span class="at"> </span><span class="st">"Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"</span></span>
+<span id="cb13-42"><a href="#cb13-42" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> admin</span></span>
+<span id="cb13-43"><a href="#cb13-43" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> eem-admin.gym.lan</span></span>
+<span id="cb13-44"><a href="#cb13-44" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb13-45"><a href="#cb13-45" aria-hidden="true" tabindex="-1"></a><span class="co">          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.</span></span>
+<span id="cb13-46"><a href="#cb13-46" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">external-dns.alpha.kubernetes.io/ttl</span><span class="kw">:</span><span class="at"> </span><span class="st">"300"</span></span>
+<span id="cb13-47"><a href="#cb13-47" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"nginx"</span></span>
+<span id="cb13-48"><a href="#cb13-48" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">nginx.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb13-49"><a href="#cb13-49" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
+<span id="cb13-50"><a href="#cb13-50" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
+<span id="cb13-51"><a href="#cb13-51" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/healthcheck-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb13-52"><a href="#cb13-52" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb13-53"><a href="#cb13-53" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/subnets</span><span class="kw">:</span><span class="at"> </span><span class="st">"subnet-xxxx, subnet-yyyy, subnet-zzzz"</span></span>
+<span id="cb13-54"><a href="#cb13-54" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/security-groups</span><span class="kw">:</span><span class="at"> </span><span class="st">"eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"</span></span>
+<span id="cb13-55"><a href="#cb13-55" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/tags</span><span class="kw">:</span><span class="at"> </span><span class="st">"Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"</span></span>
+<span id="cb13-56"><a href="#cb13-56" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> server</span></span>
+<span id="cb13-57"><a href="#cb13-57" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> eem.server.gym.lan</span></span>
+<span id="cb13-58"><a href="#cb13-58" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb13-59"><a href="#cb13-59" aria-hidden="true" tabindex="-1"></a><span class="co">          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.</span></span>
+<span id="cb13-60"><a href="#cb13-60" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">external-dns.alpha.kubernetes.io/ttl</span><span class="kw">:</span><span class="at"> </span><span class="st">"300"</span></span>
+<span id="cb13-61"><a href="#cb13-61" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"nginx"</span></span>
+<span id="cb13-62"><a href="#cb13-62" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">nginx.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb13-63"><a href="#cb13-63" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
+<span id="cb13-64"><a href="#cb13-64" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
+<span id="cb13-65"><a href="#cb13-65" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/healthcheck-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb13-66"><a href="#cb13-66" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb13-67"><a href="#cb13-67" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/subnets</span><span class="kw">:</span><span class="at"> </span><span class="st">"subnet-xxxx, subnet-yyyy, subnet-zzzz"</span></span>
+<span id="cb13-68"><a href="#cb13-68" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/security-groups</span><span class="kw">:</span><span class="at"> </span><span class="st">"eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"</span></span>
+<span id="cb13-69"><a href="#cb13-69" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/tags</span><span class="kw">:</span><span class="at"> </span><span class="st">"Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"</span></span>
+<span id="cb13-70"><a href="#cb13-70" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">authConfig</span><span class="kw">:</span></span>
+<span id="cb13-71"><a href="#cb13-71" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">authType</span><span class="kw">:</span><span class="at"> OIDC</span></span>
+<span id="cb13-72"><a href="#cb13-72" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">oidcConfig</span><span class="kw">:</span></span>
+<span id="cb13-73"><a href="#cb13-73" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">clientIDKey</span><span class="kw">:</span><span class="at"> client-id</span></span>
+<span id="cb13-74"><a href="#cb13-74" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">clientSecretKey</span><span class="kw">:</span><span class="at"> client-secret</span></span>
+<span id="cb13-75"><a href="#cb13-75" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">discovery</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb13-76"><a href="#cb13-76" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">secretName</span><span class="kw">:</span><span class="at"> oidc-client-secret</span></span>
+<span id="cb13-77"><a href="#cb13-77" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">site</span><span class="kw">:</span><span class="at"> </span><span class="st">'https://keycloak.my-haproxy.gym.lan/realms/eem-portal'</span></span>
+<span id="cb13-78"><a href="#cb13-78" aria-hidden="true" tabindex="-1"></a><span class="co">    # Mount the custom CA cert to trust Keycloak</span></span>
+<span id="cb13-79"><a href="#cb13-79" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">tls</span><span class="kw">:</span></span>
+<span id="cb13-80"><a href="#cb13-80" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">trustedCertificates</span><span class="kw">:</span></span>
+<span id="cb13-81"><a href="#cb13-81" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">certificate</span><span class="kw">:</span><span class="at"> ca.crt</span></span>
+<span id="cb13-82"><a href="#cb13-82" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">secretName</span><span class="kw">:</span><span class="at"> keycloak-trust-secret</span></span>
+<span id="cb13-83"><a href="#cb13-83" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">storage</span><span class="kw">:</span></span>
+<span id="cb13-84"><a href="#cb13-84" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">storageClassName</span><span class="kw">:</span><span class="at"> local-path</span></span>
+<span id="cb13-85"><a href="#cb13-85" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">type</span><span class="kw">:</span><span class="at"> persistent-claim</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><strong>Apply the Configuration:</strong></p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> apply <span class="at">-f</span> eem-instance-lab.yaml</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> apply <span class="at">-f</span> eem-instance.yaml</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="tabset-3-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-3-3-tab">
+<p><strong>Use Case:</strong> EKS deployment using local credentials (no OIDC) and gp2 block storage.</p>
+<p>Create a file named <code>eem-instance.yaml</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> events.ibm.com/v1beta1</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> EventEndpointManagement</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> eem-manager</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">namespace</span><span class="kw">:</span><span class="at"> ibm-eem</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">license</span><span class="kw">:</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">accept</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">license</span><span class="kw">:</span><span class="at"> </span><span class="st">'L-CYBH-K48BZQ'</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">metric</span><span class="kw">:</span><span class="at"> VIRTUAL_PROCESSOR_CORE</span></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">use</span><span class="kw">:</span><span class="at"> EventAutomationProduction</span></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">manager</span><span class="kw">:</span></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">endpoints</span><span class="kw">:</span></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> ui</span></span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> eem-portal.corp</span></span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a><span class="co">          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.</span></span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">external-dns.alpha.kubernetes.io/ttl</span><span class="kw">:</span><span class="at"> </span><span class="st">"300"</span></span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"alb"</span></span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/healthcheck-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/subnets</span><span class="kw">:</span><span class="at"> </span><span class="st">"subnet-xxxx, subnet-yyyy, subnet-zzzz"</span></span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/security-groups</span><span class="kw">:</span><span class="at"> </span><span class="st">"eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"</span></span>
+<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/tags</span><span class="kw">:</span><span class="at"> </span><span class="st">"Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"</span></span>
+<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> gateway</span></span>
+<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> eem-gateway.corp</span></span>
+<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a><span class="co">          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.</span></span>
+<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">external-dns.alpha.kubernetes.io/ttl</span><span class="kw">:</span><span class="at"> </span><span class="st">"300"</span></span>
+<span id="cb15-32"><a href="#cb15-32" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"alb"</span></span>
+<span id="cb15-33"><a href="#cb15-33" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
+<span id="cb15-34"><a href="#cb15-34" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
+<span id="cb15-35"><a href="#cb15-35" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/healthcheck-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb15-36"><a href="#cb15-36" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb15-37"><a href="#cb15-37" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/subnets</span><span class="kw">:</span><span class="at"> </span><span class="st">"subnet-xxxx, subnet-yyyy, subnet-zzzz"</span></span>
+<span id="cb15-38"><a href="#cb15-38" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/security-groups</span><span class="kw">:</span><span class="at"> </span><span class="st">"eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"</span></span>
+<span id="cb15-39"><a href="#cb15-39" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/tags</span><span class="kw">:</span><span class="at"> </span><span class="st">"Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"</span></span>
+<span id="cb15-40"><a href="#cb15-40" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> admin</span></span>
+<span id="cb15-41"><a href="#cb15-41" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> eem-admin.corp</span></span>
+<span id="cb15-42"><a href="#cb15-42" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb15-43"><a href="#cb15-43" aria-hidden="true" tabindex="-1"></a><span class="co">          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.</span></span>
+<span id="cb15-44"><a href="#cb15-44" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">external-dns.alpha.kubernetes.io/ttl</span><span class="kw">:</span><span class="at"> </span><span class="st">"300"</span></span>
+<span id="cb15-45"><a href="#cb15-45" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"alb"</span></span>
+<span id="cb15-46"><a href="#cb15-46" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
+<span id="cb15-47"><a href="#cb15-47" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
+<span id="cb15-48"><a href="#cb15-48" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/healthcheck-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb15-49"><a href="#cb15-49" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb15-50"><a href="#cb15-50" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/subnets</span><span class="kw">:</span><span class="at"> </span><span class="st">"subnet-xxxx, subnet-yyyy, subnet-zzzz"</span></span>
+<span id="cb15-51"><a href="#cb15-51" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/security-groups</span><span class="kw">:</span><span class="at"> </span><span class="st">"eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"</span></span>
+<span id="cb15-52"><a href="#cb15-52" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/tags</span><span class="kw">:</span><span class="at"> </span><span class="st">"Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"</span></span>
+<span id="cb15-53"><a href="#cb15-53" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> server</span></span>
+<span id="cb15-54"><a href="#cb15-54" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">host</span><span class="kw">:</span><span class="at"> eem.server.corp</span></span>
+<span id="cb15-55"><a href="#cb15-55" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb15-56"><a href="#cb15-56" aria-hidden="true" tabindex="-1"></a><span class="co">          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.</span></span>
+<span id="cb15-57"><a href="#cb15-57" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">external-dns.alpha.kubernetes.io/ttl</span><span class="kw">:</span><span class="at"> </span><span class="st">"300"</span></span>
+<span id="cb15-58"><a href="#cb15-58" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"alb"</span></span>
+<span id="cb15-59"><a href="#cb15-59" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
+<span id="cb15-60"><a href="#cb15-60" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
+<span id="cb15-61"><a href="#cb15-61" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/healthcheck-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb15-62"><a href="#cb15-62" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb15-63"><a href="#cb15-63" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/subnets</span><span class="kw">:</span><span class="at"> </span><span class="st">"subnet-xxxx, subnet-yyyy, subnet-zzzz"</span></span>
+<span id="cb15-64"><a href="#cb15-64" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/security-groups</span><span class="kw">:</span><span class="at"> </span><span class="st">"eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"</span></span>
+<span id="cb15-65"><a href="#cb15-65" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/tags</span><span class="kw">:</span><span class="at"> </span><span class="st">"Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"</span></span>
+<span id="cb15-66"><a href="#cb15-66" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">authConfig</span><span class="kw">:</span></span>
+<span id="cb15-67"><a href="#cb15-67" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">authType</span><span class="kw">:</span><span class="at"> LOCAL</span></span>
+<span id="cb15-68"><a href="#cb15-68" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">storage</span><span class="kw">:</span></span>
+<span id="cb15-69"><a href="#cb15-69" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">storageClassName</span><span class="kw">:</span><span class="at"> gp2</span></span>
+<span id="cb15-70"><a href="#cb15-70" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">type</span><span class="kw">:</span><span class="at"> persistent-claim</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Apply the Configuration:</strong></p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> apply <span class="at">-f</span> eem-instance.yaml</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </div>
 </div>
@@ -469,31 +699,76 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>The Operator will now provision the PostgreSQL database, API Manager, and Gateway pods. This process can take 5-10 minutes. Watch the status with: <code>kubectl get pods -n ibm-eem -w</code></p>
+<p>The Operator will now provision the EEM Manager pod.</p>
+<p>You can watch the pods spin up with: <code>kubectl get pods -n ibm-eem -w</code></p>
+<p>To monitor the actual readiness status of the deployment, watch the Custom Resource: <code>kubectl get eventendpointmanagement eem-manager -n ibm-eem -w</code></p>
 </div>
 </div>
 </section>
 <section id="configure-user-roles" class="level3">
 <h3 class="anchored" data-anchor-id="configure-user-roles">2.5 Configure User Roles</h3>
-<p>By default, the OIDC user has no permissions. You must map the Keycloak user subject (UUID) to the EEM <code>admin</code> role.</p>
-<p><strong>1. Create the Mapping File:</strong> Replace the <code>id</code> below with your Keycloak User UUID.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"mappings"</span><span class="fu">:</span> <span class="ot">[</span></span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"id"</span><span class="fu">:</span> <span class="st">"130ea2d9-e60c-4f28-8499-386ecda2d825"</span><span class="fu">,</span></span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"roles"</span><span class="fu">:</span> <span class="ot">[</span></span>
-<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"admin"</span><span class="ot">,</span></span>
-<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"author"</span></span>
-<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>      <span class="ot">]</span></span>
-<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
-<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span></span>
-<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><strong>2. Patch the Secret:</strong> We inject this JSON directly into the user-roles secret managed by the operator.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Save the JSON to a file named 'myroles.json' first</span></span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> patch secret eem-manager-ibm-eem-user-roles <span class="dt">\</span></span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--type</span><span class="op">=</span><span class="st">'json'</span> <span class="dt">\</span></span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">-p</span><span class="op">=</span><span class="st">"[{</span><span class="dt">\"</span><span class="st">op</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">replace</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">path</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">/data/user-mapping.json</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">value</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="va">$(</span><span class="fu">cat</span> myroles.json <span class="kw">|</span> <span class="fu">base64</span> <span class="at">-w</span> 0<span class="va">)</span><span class="dt">\"</span><span class="st">}]"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>When deploying your EEM instance, you must grant initial access to the system. The configuration depends entirely on your chosen authentication method.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-4-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-1" role="tab" aria-controls="tabset-4-1" aria-selected="true" href="">Option A: OIDC Auth (UUID Mapping)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-4-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-2" role="tab" aria-controls="tabset-4-2" aria-selected="false" href="">Option B: Local Auth (Credentials &amp; Mapping)</a></li></ul>
+<div class="tab-content">
+<div id="tabset-4-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-4-1-tab">
+<p><strong>Use Case:</strong> External Identity Provider (Keycloak, Auth0, etc.)</p>
+<p>By default, an OIDC user has no permissions upon first login. You must map the Identity Provider’s user subject (UUID) directly to the EEM roles.</p>
+<p><strong>1. Create the Mapping File:</strong> Create a file named <code>myroles.json</code> and replace the <code>id</code> below with your Keycloak User UUID.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"mappings"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"id"</span><span class="fu">:</span> <span class="st">"130ea2d9-e60c-4f28-8499-386ecda2d825"</span><span class="fu">,</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"roles"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"admin"</span><span class="ot">,</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"author"</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>      <span class="ot">]</span></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>2. Patch the Roles Secret:</strong> Inject this JSON directly into the user-roles secret managed by the operator.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> patch secret eem-manager-ibm-eem-user-roles <span class="dt">\</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--type</span><span class="op">=</span><span class="st">'json'</span> <span class="dt">\</span></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">-p</span><span class="op">=</span><span class="st">"[{</span><span class="dt">\"</span><span class="st">op</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">replace</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">path</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">/data/user-mapping.json</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">value</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="va">$(</span><span class="fu">cat</span> myroles.json <span class="kw">|</span> <span class="fu">base64</span> <span class="at">-w</span> 0<span class="va">)</span><span class="dt">\"</span><span class="st">}]"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="tabset-4-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-4-2-tab">
+<p><strong>Use Case:</strong> Built-in Local Directory</p>
+<p>For local authentication, you must first define the user credentials, and then map that new user ID to the appropriate roles.</p>
+<p><strong>1. Create the Credentials File:</strong> Create a file named <code>myusers.json</code> with your desired administrator credentials.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"users"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>        <span class="fu">{</span></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>            <span class="dt">"username"</span><span class="fu">:</span> <span class="st">"eemadmin"</span><span class="fu">,</span></span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>            <span class="dt">"password"</span><span class="fu">:</span> <span class="st">"Password1$"</span></span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>        <span class="fu">}</span></span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>    <span class="ot">]</span></span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>2. Patch the Credentials Secret:</strong> Inject the user definition into the credentials secret.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> patch secret eem-manager-ibm-eem-user-credentials <span class="dt">\</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--type</span><span class="op">=</span><span class="st">'json'</span> <span class="dt">\</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">-p</span><span class="op">=</span><span class="st">"[{</span><span class="dt">\"</span><span class="st">op</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">replace</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">path</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">/data/user-credentials.json</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">value</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="va">$(</span><span class="fu">cat</span> myusers.json <span class="kw">|</span> <span class="fu">base64</span> <span class="at">-w</span> 0<span class="va">)</span><span class="dt">\"</span><span class="st">}]"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>3. Create the Mapping File:</strong> Create a file named <code>myroles.json</code> mapping your new <code>username</code> to the administrative roles.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"mappings"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"id"</span><span class="fu">:</span> <span class="st">"eemadmin"</span><span class="fu">,</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"roles"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"admin"</span><span class="ot">,</span></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"author"</span></span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>      <span class="ot">]</span></span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span></span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>4. Patch the Roles Secret:</strong> Inject the mapping JSON into the user-roles secret.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb22"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> patch secret eem-manager-ibm-eem-user-roles <span class="dt">\</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--type</span><span class="op">=</span><span class="st">'json'</span> <span class="dt">\</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">-p</span><span class="op">=</span><span class="st">"[{</span><span class="dt">\"</span><span class="st">op</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">replace</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">path</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">/data/user-mapping.json</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">value</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="va">$(</span><span class="fu">cat</span> myroles.json <span class="kw">|</span> <span class="fu">base64</span> <span class="at">-w</span> 0<span class="va">)</span><span class="dt">\"</span><span class="st">}]"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+</div>
 <div class="callout callout-style-default callout-tip callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -504,7 +779,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Navigate to <code>https://eem-portal.gym.lan</code> (or your configured host). Log in with your Keycloak credentials. You should see the <strong>Administration</strong> and <strong>Manage</strong> menu items, confirming that the role mapping was successful.</p>
+<p>Navigate to your configured UI host (e.g., <code>https://eem-portal.gym.lan</code> or <code>https://portal.eem.corp</code>). Log in with your Keycloak or Local credentials. You should see the <strong>Administration</strong> and <strong>Manage</strong> menu items, confirming that the role mapping was successful.</p>
 <p><strong>Note:</strong> The role mapping might take a few minutes to propagate. If you see an “Unauthorized” message, wait a moment and refresh.</p>
 </div>
 </div>

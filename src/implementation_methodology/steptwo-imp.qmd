@@ -294,6 +294,7 @@ spec:
           # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
           external-dns.alpha.kubernetes.io/ttl: "300"
           kubernetes.io/ingress.class: "nginx"
+          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
           alb.ingress.kubernetes.io/scheme: "internal"
           alb.ingress.kubernetes.io/target-type: "ip"
           alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
@@ -307,6 +308,7 @@ spec:
           # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
           external-dns.alpha.kubernetes.io/ttl: "300"
           kubernetes.io/ingress.class: "nginx"
+          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
           alb.ingress.kubernetes.io/scheme: "internal"
           alb.ingress.kubernetes.io/target-type: "ip"
           alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
@@ -320,6 +322,7 @@ spec:
           # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
           external-dns.alpha.kubernetes.io/ttl: "300"
           kubernetes.io/ingress.class: "nginx"
+          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
           alb.ingress.kubernetes.io/scheme: "internal"
           alb.ingress.kubernetes.io/target-type: "ip"
           alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
@@ -333,6 +336,7 @@ spec:
           # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
           external-dns.alpha.kubernetes.io/ttl: "300"
           kubernetes.io/ingress.class: "nginx"
+          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
           alb.ingress.kubernetes.io/scheme: "internal"
           alb.ingress.kubernetes.io/target-type: "ip"
           alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
@@ -473,7 +477,7 @@ When deploying your EEM instance, you must grant initial access to the system. T
 By default, an OIDC user has no permissions upon first login. You must map the Identity Provider's user subject (UUID) directly to the EEM roles.
 
 **1. Create the Mapping File:**
-Replace the `id` below with your Keycloak User UUID.
+Create a file named `myroles.json` and replace the `id` below with your Keycloak User UUID.
 
 ```json
 {
@@ -489,22 +493,53 @@ Replace the `id` below with your Keycloak User UUID.
 }
 ```
 
-## Option B: Local Auth (User Definition)
+**2. Patch the Roles Secret:**
+Inject this JSON directly into the user-roles secret managed by the operator.
+
+```bash
+kubectl patch secret eem-manager-ibm-eem-user-roles \
+  --namespace ibm-eem \
+  --type='json' \
+  -p="[{\"op\" : \"replace\" ,\"path\" : \"/data/user-mapping.json\" ,\"value\" : \"$(cat myroles.json | base64 -w 0)\"}]"
+```
+
+## Option B: Local Auth (Credentials & Mapping)
 **Use Case:** Built-in Local Directory
 
-For local authentication, you do not map an existing UUID. Instead, you define the actual user credentials, profile information, and role assignments directly in the payload.
+For local authentication, you must first define the user credentials, and then map that new user ID to the appropriate roles.
 
-**1. Create the User File:**
-Replace the values below with your desired administrator credentials.
+**1. Create the Credentials File:**
+Create a file named `myusers.json` with your desired administrator credentials.
 
 ```json
 {
-  "users": [
+    "users": [
+        {
+            "username": "eemadmin",
+            "password": "Password1$"
+        }
+    ]
+}
+```
+
+**2. Patch the Credentials Secret:**
+Inject the user definition into the credentials secret.
+
+```bash
+kubectl patch secret eem-manager-ibm-eem-user-credentials \
+  --namespace ibm-eem \
+  --type='json' \
+  -p="[{\"op\" : \"replace\" ,\"path\" : \"/data/user-credentials.json\" ,\"value\" : \"$(cat myusers.json | base64 -w 0)\"}]"
+```
+
+**3. Create the Mapping File:**
+Create a file named `myroles.json` mapping your new `username` to the administrative roles.
+
+```json
+{
+  "mappings": [
     {
-      "username": "eemadmin",
-      "password": "YourSecurePassword123!",
-      "firstName": "System",
-      "lastName": "Administrator",
+      "id": "eemadmin",
       "roles": [
         "admin",
         "author"
@@ -514,22 +549,21 @@ Replace the values below with your desired administrator credentials.
 }
 ```
 
-:::
-
-**2. Patch the Secret:**
-We inject this JSON directly into the user-roles secret managed by the operator.
+**4. Patch the Roles Secret:**
+Inject the mapping JSON into the user-roles secret.
 
 ```bash
-# Save the JSON to a file named 'myroles.json' first
 kubectl patch secret eem-manager-ibm-eem-user-roles \
   --namespace ibm-eem \
   --type='json' \
   -p="[{\"op\" : \"replace\" ,\"path\" : \"/data/user-mapping.json\" ,\"value\" : \"$(cat myroles.json | base64 -w 0)\"}]"
 ```
 
+:::
+
 :::{.callout-tip}
 ### Verification
-Navigate to `https://eem-portal.gym.lan` (or your configured host). Log in with your Keycloak credentials. You should see the **Administration** and **Manage** menu items, confirming that the role mapping was successful.  
+Navigate to your configured UI host (e.g., `https://eem-portal.gym.lan` or `https://portal.eem.corp`). Log in with your Keycloak or Local credentials. You should see the **Administration** and **Manage** menu items, confirming that the role mapping was successful.  
 
 **Note:** The role mapping might take a few minutes to propagate. If you see an "Unauthorized" message, wait a moment and refresh.
 :::

@@ -32,6 +32,14 @@ curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 ```
 :::
 
+:::{.callout-tip}
+### Skopeo install on Linux (RHEL 8): 
+
+```bash
+sudo dnf -y install skopeo
+```
+:::
+
 ### 2. Ingress Strategy (SSL Passthrough)
 The Event Gateway component requires a specialized ingress configuration to handle the Kafka protocol correctly. While standard TLS termination works for the API Manager and Portal, the Gateway often requires direct TCP access for protocol handling and client certificate verification.
 
@@ -59,18 +67,20 @@ If your OIDC provider (e.g., Keycloak) utilizes a self-signed certificate or a p
 :::
 
 ### 4. Supply Chain (Image Mirroring)
-The target environment prohibits direct access to public registries (`cp.icr.io`). All container images must be staged in the client's internal trusted registry (e.g., Artifactory).
+The target environment prohibits direct access to public registries (`cp.icr.io`, `icr.io`). All container images must be staged in the internal trusted registry (e.g., Artifactory).
 
 :::{.callout-note}
 ### IBM entitlement key 
 You will need an IBM entitlement key to mirror the images or install without mirroring. This can be obtained [here](https://myibm.ibm.com/products-services/containerlibrary).
 :::
 
-**Enterprise Pipeline Integration**
-If the organization utilizes a centralized image ingestion process, please configure the pipeline to pull from the **IBM Entitled Registry**.
 
-* **Source Registry:** `cp.icr.io`
-* **Source Namespace:** `cp/ibm-eventendpointmanagement`
+
+**Enterprise Pipeline Integration**
+If the organization utilizes a centralized image ingestion process, please configure the pipeline to pull from both the **IBM Entitled Registry** and the **IBM Open Registry**.
+
+* **Source Registries:** `cp.icr.io`, `icr.io`
+* **Source Namespaces:** `cp/ibm-eventendpointmanagement`, `cpopen/ibm-eventendpointmanagement`, `cpopen`
 
 **Core Images:**
 
@@ -78,11 +88,23 @@ If the organization utilizes a centralized image ingestion process, please confi
 | :--- | :--- |
 | **Manager/Backend** | `cp.icr.io/cp/ibm-eventendpointmanagement/eim-backend` |
 | **Operator** | `icr.io/cpopen/ibm-eventendpointmanagement-operator` |
-| **Gateway** | `cp.icr.io/cp/ibm-eventendpointmanagement/eim-gateway` |
+| **Gateway** | `icr.io/cpopen/ibm-eventendpointmanagement/egw` |
+| **Gateway Tutorial** | `icr.io/cpopen/ibm-eventendpointmanagement/egw-tutorial` |
 
 :::{.callout-tip}
-### Finding Tags
-To find the exact tags for a specific version, you can use `skopeo list-tags` against the repository using your entitlement key, or refer to the specific CASE bundle for your version of the operator.
+### Finding Exact Tags and Digests
+Because IBM utilizes `sha256` digests rather than standard version tags to guarantee image immutability, guessing tags or using `skopeo list-tags` can lead to `manifest unknown` errors (especially with single-architecture vs. multi-architecture index files). 
+
+The most reliable way to get the exact paths and digests for your specific deployment is to extract them directly from the Helm chart:
+
+```bash
+# 1. Pull and unpack the specific version of the chart
+helm pull ibm-helm/ibm-eem-operator --version <VERSION> --untar
+
+# 2. Extract every image reference and digest used by the operator
+helm template dummy-release ./ibm-eem-operator | grep -iE 'image:|value:.*icr\.io' | sort -u
+```
+Use the output from this command to feed your mirroring tools (like `skopeo copy`), appending `--preserve-digests` to ensure the hashes remain identical in your local registry.
 :::
 
 ### 5. Cluster Services (Cert-Manager)

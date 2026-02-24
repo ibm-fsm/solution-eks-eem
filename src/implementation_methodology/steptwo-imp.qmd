@@ -31,6 +31,28 @@ The EEM Operator manages the lifecycle of the Manager, Gateway, and Portal compo
 
 **Step 1: Install Custom Resource Definitions (CRDs)**
 
+:::{.panel-tabset}
+
+## Option A: Air-Gapped (Direct Download)
+**Target:** Restricted / Production
+
+If your cluster cannot reach the public Helm repositories directly, download the chart archive using `curl` and install it from the local file.
+
+```bash
+# 1. Download the chart archive
+curl -LO https://raw.githubusercontent.com/IBM/charts/master/repo/ibm-helm/ibm-eem-operator-crd-11.7.1.tgz
+
+# 2. Install from the local file
+helm install eem-crds ./ibm-eem-operator-crd-11.7.1.tgz \
+  --namespace ibm-eem \
+  --create-namespace
+```
+
+## Option B: Connected (Direct Install)
+**Target:** Sandbox / POC with Internet Access
+
+If your environment has outbound internet access, install directly from the IBM Helm repository.
+
 ```bash
 helm install eem-crds ibm-helm/ibm-eem-operator-crd \
   --namespace ibm-eem \
@@ -38,15 +60,72 @@ helm install eem-crds ibm-helm/ibm-eem-operator-crd \
   --version 11.7.1
 ```
 
+:::
+
 **Step 2: Install the Operator**
+
+:::{.panel-tabset}
+
+## Option A: Air-Gapped (Local Configuration)
+**Target:** Restricted / Production
+
+If pulling images from an internal Artifactory, you must download the chart, extract it, and modify the `values.yaml` file to point the operator to your local registry.
+
+```bash
+# 1. Download the chart archive
+curl -LO https://raw.githubusercontent.com/IBM/charts/master/repo/ibm-helm/ibm-eem-operator-11.7.1.tgz
+
+# 2. Extract the archive
+tar -xzf ibm-eem-operator-11.7.1.tgz
+```
+
+**Configure Local Registry Paths:**
+Open `ibm-eem-operator/values.yaml` in your preferred text editor. 
+
+1. Locate the `public` and `private` repository blocks at the top of the file and replace the IBM registry URLs with your internal Artifactory path. 
+2. In the `images` block, replace the strict `@sha256:...` digests with the standard version tag (e.g., `:11.7.1`).
+3. If your Artifactory is configured for anonymous access, clear the `operatorImagePullSecret` value so the cluster does not attempt to authenticate.
+
+*Example configuration using a local lab Artifactory:*
+```yaml
+public:
+  repo: artifactory.gym.lan:8443
+  path: docker-local/ibm-eventendpointmanagement/
+private:
+  repo: artifactory.gym.lan:8443
+  path: docker-local/ibm-eventendpointmanagement/
+
+images:
+  operator: ibm-eventendpointmanagement-operator:11.7.1
+  eemManager: eim-backend:11.7.1
+  egw: ibm-eventendpointmanagement/egw:11.7.1
+  tutorialegw: egw-tutorial:11.7.1
+
+# Clear this value if your registry allows anonymous pulls
+operatorImagePullSecret: ""
+```
+
+**Install the Operator:**
+Once your values are saved, run the install command against the local directory.
+
+```bash
+# 3. Install from the local extracted directory
+helm install eem-operator ./ibm-eem-operator \
+  --namespace ibm-eem
+```
+
+## Option B: Connected (Direct Install)
+**Target:** Sandbox / POC with Internet Access
+
+If your environment has outbound internet access, install directly from the IBM Helm repository.
 
 ```bash
 helm install eem-operator ibm-helm/ibm-eem-operator \
   --namespace ibm-eem \
-  --version 11.7.1 \
-  --set webhook.create=true \
-  --set watchAnyNamespace=false
+  --version 11.7.1
 ```
+
+:::
 
 :::{.callout-tip}
 ### Verification
@@ -96,9 +175,9 @@ We use a Custom Resource (CR) to define the EEM instance. Select the configurati
 :::{.panel-tabset}
 
 ## Option A: Production (Generic)
-**Use Case:** Standard deployment with valid CA-signed certificates.
+**Use Case:** Standard deployment with valid CA-signed certificates and OIDC authentication.
 
-Create a file named `eem-instance-prod.yaml`:
+Create a file named `eem-instance.yaml`:
 
 ```yaml
 apiVersion: events.ibm.com/v1beta1
@@ -115,13 +194,57 @@ spec:
   manager:
     endpoints:
       - name: ui
-        host: portal.eem.corp
+        host: eem-portal.corp
+        annotations:
+          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
+          external-dns.alpha.kubernetes.io/ttl: "300"
+          kubernetes.io/ingress.class: "alb"
+          alb.ingress.kubernetes.io/scheme: "internal"
+          alb.ingress.kubernetes.io/target-type: "ip"
+          alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
+          alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
+          alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
       - name: gateway
-        host: gateway.eem.corp
+        host: eem-gateway.corp
+        annotations:
+          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
+          external-dns.alpha.kubernetes.io/ttl: "300"
+          kubernetes.io/ingress.class: "alb"
+          alb.ingress.kubernetes.io/scheme: "internal"
+          alb.ingress.kubernetes.io/target-type: "ip"
+          alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
+          alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
+          alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
       - name: admin
-        host: admin.eem.corp
+        host: eem-admin.corp
+        annotations:
+          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
+          external-dns.alpha.kubernetes.io/ttl: "300"
+          kubernetes.io/ingress.class: "alb"
+          alb.ingress.kubernetes.io/scheme: "internal"
+          alb.ingress.kubernetes.io/target-type: "ip"
+          alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
+          alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
+          alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
       - name: server
-        host: server.eem.corp
+        host: eem.server.corp
+        annotations:
+          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
+          external-dns.alpha.kubernetes.io/ttl: "300"
+          kubernetes.io/ingress.class: "alb"
+          alb.ingress.kubernetes.io/scheme: "internal"
+          alb.ingress.kubernetes.io/target-type: "ip"
+          alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
+          alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
+          alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
     authConfig:
       authType: OIDC
       oidcConfig:
@@ -129,27 +252,27 @@ spec:
         clientSecretKey: client-secret
         discovery: true
         secretName: oidc-client-secret
-        site: 'https://keycloak.eem.corp/realms/ibm-eem'
+        site: 'https://keycloak.corp/realms/ibm-eem'
     # Mount the custom CA cert to trust Keycloak
     tls:
       trustedCertificates:
         - certificate: ca.crt
           secretName: keycloak-trust-secret
     storage:
-      storageClassName: gp3
+      storageClassName: gp2
       type: persistent-claim
 ```
 
 **Apply the Configuration:**
 
 ```bash
-kubectl apply -f eem-instance-prod.yaml
+kubectl apply -f eem-instance.yaml
 ```
 
 ## Option B: Lab (Self-Signed)
-**Use Case:** Lab environment needing custom trust anchors and local storage.
+**Use Case:** Lab environment needing custom trust anchors, local storage, and OIDC.
 
-Create a file named `eem-instance-lab.yaml`:
+Create a file named `eem-instance.yaml`:
 
 ```yaml
 apiVersion: events.ibm.com/v1beta1
@@ -167,12 +290,56 @@ spec:
     endpoints:
       - name: ui
         host: eem-portal.gym.lan
+        annotations:
+          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
+          external-dns.alpha.kubernetes.io/ttl: "300"
+          kubernetes.io/ingress.class: "nginx"
+          alb.ingress.kubernetes.io/scheme: "internal"
+          alb.ingress.kubernetes.io/target-type: "ip"
+          alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
+          alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
+          alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
       - name: gateway
         host: eem-gateway.gym.lan
+        annotations:
+          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
+          external-dns.alpha.kubernetes.io/ttl: "300"
+          kubernetes.io/ingress.class: "nginx"
+          alb.ingress.kubernetes.io/scheme: "internal"
+          alb.ingress.kubernetes.io/target-type: "ip"
+          alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
+          alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
+          alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
       - name: admin
         host: eem-admin.gym.lan
+        annotations:
+          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
+          external-dns.alpha.kubernetes.io/ttl: "300"
+          kubernetes.io/ingress.class: "nginx"
+          alb.ingress.kubernetes.io/scheme: "internal"
+          alb.ingress.kubernetes.io/target-type: "ip"
+          alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
+          alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
+          alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
       - name: server
-        host: eem.eem-server.gym.lan
+        host: eem.server.gym.lan
+        annotations:
+          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
+          external-dns.alpha.kubernetes.io/ttl: "300"
+          kubernetes.io/ingress.class: "nginx"
+          alb.ingress.kubernetes.io/scheme: "internal"
+          alb.ingress.kubernetes.io/target-type: "ip"
+          alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
+          alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
+          alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
     authConfig:
       authType: OIDC
       oidcConfig:
@@ -194,21 +361,116 @@ spec:
 **Apply the Configuration:**
 
 ```bash
-kubectl apply -f eem-instance-lab.yaml
+kubectl apply -f eem-instance.yaml
+```
+
+## Option C: AWS EKS (Local Auth)
+**Use Case:** EKS deployment using local credentials (no OIDC) and gp2 block storage.
+
+Create a file named `eem-instance.yaml`:
+
+```yaml
+apiVersion: events.ibm.com/v1beta1
+kind: EventEndpointManagement
+metadata:
+  name: eem-manager
+  namespace: ibm-eem
+spec:
+  license:
+    accept: true
+    license: 'L-CYBH-K48BZQ'
+    metric: VIRTUAL_PROCESSOR_CORE
+    use: EventAutomationProduction
+  manager:
+    endpoints:
+      - name: ui
+        host: eem-portal.corp
+        annotations:
+          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
+          external-dns.alpha.kubernetes.io/ttl: "300"
+          kubernetes.io/ingress.class: "alb"
+          alb.ingress.kubernetes.io/scheme: "internal"
+          alb.ingress.kubernetes.io/target-type: "ip"
+          alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
+          alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
+          alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
+      - name: gateway
+        host: eem-gateway.corp
+        annotations:
+          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
+          external-dns.alpha.kubernetes.io/ttl: "300"
+          kubernetes.io/ingress.class: "alb"
+          alb.ingress.kubernetes.io/scheme: "internal"
+          alb.ingress.kubernetes.io/target-type: "ip"
+          alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
+          alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
+          alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
+      - name: admin
+        host: eem-admin.corp
+        annotations:
+          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
+          external-dns.alpha.kubernetes.io/ttl: "300"
+          kubernetes.io/ingress.class: "alb"
+          alb.ingress.kubernetes.io/scheme: "internal"
+          alb.ingress.kubernetes.io/target-type: "ip"
+          alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
+          alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
+          alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
+      - name: server
+        host: eem.server.corp
+        annotations:
+          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
+          external-dns.alpha.kubernetes.io/ttl: "300"
+          kubernetes.io/ingress.class: "alb"
+          alb.ingress.kubernetes.io/scheme: "internal"
+          alb.ingress.kubernetes.io/target-type: "ip"
+          alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
+          alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
+          alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
+    authConfig:
+      authType: LOCAL
+    storage:
+      storageClassName: gp2
+      type: persistent-claim
+```
+
+**Apply the Configuration:**
+
+```bash
+kubectl apply -f eem-instance.yaml
 ```
 
 :::
 
-
 :::{.callout-note}
 ### Startup Time
-The Operator will now provision the PostgreSQL database, API Manager, and Gateway pods. This process can take 5-10 minutes. Watch the status with:
+The Operator will now provision the EEM Manager pod.
+
+You can watch the pods spin up with:
 `kubectl get pods -n ibm-eem -w`
+
+To monitor the actual readiness status of the deployment, watch the Custom Resource:
+`kubectl get eventendpointmanagement eem-manager -n ibm-eem -w`
 :::
 
 ### 2.5 Configure User Roles
 
-By default, the OIDC user has no permissions. You must map the Keycloak user subject (UUID) to the EEM `admin` role.
+When deploying your EEM instance, you must grant initial access to the system. The configuration depends entirely on your chosen authentication method.
+
+:::{.panel-tabset}
+
+## Option A: OIDC Auth (UUID Mapping)
+**Use Case:** External Identity Provider (Keycloak, Auth0, etc.)
+
+By default, an OIDC user has no permissions upon first login. You must map the Identity Provider's user subject (UUID) directly to the EEM roles.
 
 **1. Create the Mapping File:**
 Replace the `id` below with your Keycloak User UUID.
@@ -226,6 +488,33 @@ Replace the `id` below with your Keycloak User UUID.
   ]
 }
 ```
+
+## Option B: Local Auth (User Definition)
+**Use Case:** Built-in Local Directory
+
+For local authentication, you do not map an existing UUID. Instead, you define the actual user credentials, profile information, and role assignments directly in the payload.
+
+**1. Create the User File:**
+Replace the values below with your desired administrator credentials.
+
+```json
+{
+  "users": [
+    {
+      "username": "eemadmin",
+      "password": "YourSecurePassword123!",
+      "firstName": "System",
+      "lastName": "Administrator",
+      "roles": [
+        "admin",
+        "author"
+      ]
+    }
+  ]
+}
+```
+
+:::
 
 **2. Patch the Secret:**
 We inject this JSON directly into the user-roles secret managed by the operator.

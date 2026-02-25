@@ -30,7 +30,8 @@ EEM relies heavily on **Cert-Manager** for internal mTLS communication between t
 ## Option A: Production (Generic)
 On standard Kubernetes platforms, utilize an existing Certificate Manager installation.
 
-**Requirements:**  
+**Requirements:**
+
 * **Version:** v1.12+ recommended.  
 * **APIs:** Must support `Issuer.cert-manager.io/v1` and `Certificate.cert-manager.io/v1` GroupVersionKinds (GVK).  
 * **Alternative:** If Cert-Manager is not allowed, you must manually create certificates for all components and provide them via Kubernetes secrets (complex).  

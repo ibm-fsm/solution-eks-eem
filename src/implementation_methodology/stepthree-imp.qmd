@@ -8,8 +8,245 @@ date: last-modified
 ```
 <br>
 
-Phasellus at risus egestas, ultricies tortor efficitur, auctor augue. Suspendisse finibus maximus dui nec condimentum. Proin fringilla efficitur vehicula. Suspendisse sem lacus, iaculis quis erat et, facilisis sagittis est. Sed sapien justo, condimentum vitae aliquet sed, faucibus at ex. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Fusce placerat ante eget diam tincidunt, vitae tincidunt sapien malesuada. Nullam ullamcorper justo eros. Duis ultricies aliquam dui, id aliquam lorem congue vitae. Ut porttitor, tellus eu dignissim semper, turpis nunc cursus libero, sed placerat est dui non enim.
+With the EEM Manager and Gateway pods running, the next phase is establishing the data plane. The Gateway requires a backend Kafka cluster to route traffic to, and a Layer 4 network path to accept incoming mTLS/TLS client connections.
 
-Vestibulum libero dolor, vehicula vitae risus non, consequat gravida neque. Maecenas a posuere sem. Quisque dignissim porta pretium. Nam mattis lacus commodo lobortis consequat. Vestibulum at massa a quam egestas accumsan. Fusce ac neque eu libero maximus aliquet id quis metus. In sodales neque ut turpis iaculis vehicula. Sed volutpat, tellus non laoreet aliquet, risus felis ornare dolor, interdum venenatis turpis metus in lorem. Aliquam quam ligula, porttitor non ultrices ac, lacinia ullamcorper massa. Integer molestie eleifend urna, imperdiet dignissim tellus malesuada ac. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam tristique sem ac purus interdum, vitae pharetra erat fringilla. Integer non nunc a eros porttitor rutrum. Suspendisse ut libero urna. Vestibulum vitae est at diam vestibulum aliquet. Donec porta nunc eget lobortis mollis.
+### 3.1 Backend Kafka Provisioning
 
-Vestibulum luctus sodales odio, at luctus lacus lobortis a. Aliquam vulputate id turpis sit amet bibendum. Donec a dignissim tellus, vel vehicula erat. Pellentesque hendrerit ex magna, at dictum est pretium a. Vivamus faucibus ipsum lectus, ut elementum diam interdum scelerisque. Cras magna sapien, tincidunt quis eleifend at, tincidunt non eros. Aliquam ac augue turpis.
+The EEM Gateway acts as a secure proxy and requires a target Kafka cluster to manage.
+
+:::{.panel-tabset}
+
+## Option A: Production (Bring Your Own Kafka)
+**Use Case:** Connecting to an existing enterprise Kafka environment (e.g., AWS MSK, Confluent Cloud, or IBM Event Streams).
+
+Ensure you have the following information from your Kafka administrators:  
+* Bootstrap server addresses.  
+* TLS certificates (if using secure connections).  
+* Authentication credentials (SCRAM, mTLS, or plain).  
+
+## Option B: Lab (Test Broker)
+**Use Case:** Spinning up a temporary, lightweight Kafka broker in your k3s environment to validate Gateway routing.
+
+We can deploy a simple, single-node Kafka instance using the Bitnami Helm chart.
+
+```bash
+# 1. Add the Bitnami repository
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+
+# 2. Install a basic Kafka cluster in a new namespace
+helm install test-kafka bitnami/kafka \
+  --namespace kafka-lab \
+  --create-namespace \
+  --set replicaCount=1 \
+  --set zookeeper.enabled=false \
+  --set kraft.enabled=true \
+  --set listeners.client.protocol=PLAINTEXT \
+  --set image.repository=bitnamilegacy/kafka
+```
+*Note: This creates a plaintext broker at `test-kafka.kafka-lab.svc.cluster.local:9092` which is perfect for internal Gateway testing.*
+
+**Create the Backend Topic**  
+If you are using the temporary Bitnami broker, you need to create a test topic on the Kafka instance itself before EEM can proxy it. Run this command to create a topic named `test-topic`:
+
+```bash
+kubectl exec -it test-kafka-controller-0 -n kafka-lab -- kafka-topics.sh \
+  --create \
+  --bootstrap-server localhost:9092 \
+  --topic test-topic \
+  --partitions 1 \
+  --replication-factor 1
+```
+
+:::
+
+### 3.2 Connect the Backend Kafka Cluster
+
+Once the Gateway is connected, you must tell it where to route the Kafka traffic.
+
+:::{.panel-tabset}
+
+## Option A: Production (Enterprise Kafka)
+**Use Case:** Connecting to AWS MSK, Confluent, or Event Streams.
+
+1. Navigate to the **Clusters** page in the EEM UI.  
+2. Click **Add cluster**.  
+3. Provide your production Bootstrap Server address and upload the required TLS certificates or SCRAM credentials provided by your Kafka administrator.  
+4. Select the Gateway you registered in Step 4 to handle the routing.  
+
+## Option B: Lab (Bitnami Test Broker)
+**Use Case:** Connecting to the plaintext Bitnami broker we spun up in the `kafka-lab` namespace.
+
+1. Navigate to the **Clusters** page in the EEM UI.  
+2. Click **Add cluster**.  
+3. Enter a name (e.g., `test-kafka-cluster`).  
+4. Enter the internal Kubernetes DNS name for the bootstrap server: `test-kafka.kafka-lab.svc.cluster.local:9092`.  
+5. For Security Protocol, select **PLAINTEXT** since this is an internal, non-secure test broker.  
+6. Select the Gateway you registered in Step 4 to associate it with this cluster.  
+
+:::
+
+:::{.callout-note}
+### Pending Validation Status
+After adding the cluster, you will notice its state is listed as **Pending validation**. This is expected! The EEM Manager is simply "waiting for a gateway group to report a validation status." Because the Manager itself does not connect directly to the broker for data traffic, the connection cannot be actively tested until we register a Gateway and link it to this cluster in the upcoming steps.
+:::
+
+### 3.3 Register the Gateway in the EEM UI
+
+Now that the infrastructure is ready, we need to register the Gateway with the Manager. This process generates a Custom Resource (CR) YAML file containing the cryptographic trust and connection details required for the two components to communicate.
+
+**1. Generate the Gateway YAML:**  
+
+* Log into the EEM Manager UI.  
+* Navigate to the **Gateways** page from the side menu.  
+* Click **Add gateway**.  
+* When prompted for the deployment type, select **Operator-managed deployment**. This ensures the IBM Operator handles the lifecycle, scaling, and certificate rotation for the gateway.  
+* On the **Provide details** screen, configure the following settings:
+
+| Field | Configuration |
+| :--- | :--- |
+| **Gateway group** | Select **Create a new gateway group** and enter a name (e.g., `default-group`). |
+| **Gateway ID** | Provide a unique identifier for this gateway (e.g., `eem-gateway-lab` or `eem-gateway-prod`). |
+| **Replicas** | Leave at `1` for the lab, or scale up as needed for production. |
+* Click **Create** to proceed to the **Deploy Event Gateway** step. 
+* Click the copy icon on the code block to copy the generated deployment configuration and paste it into a new file named `gateway-deployment.yaml`.
+
+**2. Modify the Generated Configuration:**
+
+Before applying the file, you must make three important modifications:
+
+1. Accept the license agreement (`accept: true`).
+2. Reduce the `maxNumKafkaBrokers` to save cluster resources.
+3. **Define the Ingress Endpoint:** The Operator requires a `spec.endpoints` block to know how to expose the Gateway pods to the network.
+
+Open `gateway-deployment.yaml` in your text editor and modify the `spec` block.
+
+:::{.panel-tabset}
+
+## Option A: Production (AWS EKS)
+
+**Use Case:** Matching the production spec on AWS EKS. We will allocate capacity for 3 brokers and define the endpoint with the ALB annotations to satisfy the webhook (though actual traffic will use our manual NLB).
+
+```yaml
+# ... (inside gateway-deployment.yaml) ...
+spec:
+  license:
+    # 1. Accept the license
+    accept: true
+    license: "L-CYBH-K48BZQ"
+    metric: "VIRTUAL_PROCESSOR_CORE"
+    use: "EventAutomationProduction"
+  managerEndpoint: "https://eem.server.eem.corp/gateway"
+  gatewayGroupName: "default-group"
+  gatewayID: "eem-gateway-prod"
+  replicas: 1
+  # 2. Reduce broker capacity
+  maxNumKafkaBrokers: 3
+  # 3. Define the endpoint routing
+    endpoints:
+    - name: gateway
+      host: kafka-gateway.eem.corp
+      annotations:
+        kubernetes.io/ingress.class: "alb"
+        alb.ingress.kubernetes.io/scheme: "internal"
+        alb.ingress.kubernetes.io/target-type: "ip"
+  # ... rest of file remains unchanged ...
+```
+
+## Option B: Lab (NGINX)
+**Use Case:** Saving maximum resources in the k3s lab while testing the Bitnami broker. We only need 1 broker endpoint and will route it using the NGINX controller with SSL passthrough enabled.
+
+```yaml
+# ... (inside gateway-deployment.yaml) ...
+spec:
+  license:
+    # 1. Accept the license
+    accept: true
+    license: "L-CYBH-K48BZQ"
+    metric: "VIRTUAL_PROCESSOR_CORE"
+    use: "EventAutomationProduction"
+  managerEndpoint: "https://eem.eem-server.gym.lan/gateway"
+  gatewayGroupName: "default-group"
+  gatewayID: "eem-gateway-lab"
+  replicas: 1
+  # 2. Reduce broker capacity
+  maxNumKafkaBrokers: 1
+  # 3. Define the endpoint routing
+  endpoints:
+    - name: gateway
+      host: kafka-gateway.gym.lan
+      annotations:
+        kubernetes.io/ingress.class: "nginx"
+        nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+  # ... rest of file remains unchanged ...
+```
+
+:::
+
+**3. Apply the Gateway CR:**
+Once your modifications are saved, apply the YAML directly to the cluster to establish the connection:
+
+```bash
+kubectl apply -f gateway-deployment.yaml -n ibm-eem
+```
+
+:::{.callout-tip}
+### Verification
+Wait a few moments, then check the **Gateways** page in the EEM UI. Your new gateway should appear with a "Connected" status.
+:::
+
+### 3.4 Expose the Gateway (Layer 4 Routing)
+
+Because Kafka relies on strict mTLS handshakes between the client and the Gateway, standard Layer 7 HTTP/S load balancing will break the connection. We must expose the Gateway pods using a Layer 4 TCP passthrough. 
+
+:::{.panel-tabset}
+
+## Option A: AWS EKS (Manual NLB)
+**Use Case:** The IBM Operator generated an ALB to satisfy cluster admission webhooks, but we need an actual Network Load Balancer (NLB) to handle the TCP mTLS traffic.
+
+Create a manual `Service` to provision an AWS NLB that targets the running Gateway pods directly.
+
+Create a file named `eem-gateway-nlb.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: eem-gateway-nlb
+  namespace: ibm-eem
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "TCP"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    # Anonymized enterprise tags
+    service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "Name=eem-gateway-nlb,tfc-application-group=event-streaming,tfc-technical-environment=lab"
+spec:
+  type: LoadBalancer
+  ports:
+    - name: gateway-tls
+      port: 443
+      targetPort: 8443
+      protocol: TCP
+  selector:
+    # These labels target the Gateway pods provisioned by your EEM Custom Resource
+    app.kubernetes.io/instance: eem-manager
+    app.kubernetes.io/name: gateway
+```
+
+**Apply the NLB Service:**
+```bash
+kubectl apply -f eem-gateway-nlb.yaml
+```
+*Update your DNS records so that `gateway.eem.corp` points to the new NLB hostname rather than the placeholder ALB.*
+
+## Option B: Lab (NGINX SSL Passthrough)
+**Use Case:** Using the in-cluster NGINX ingress controller we configured earlier.
+
+Because we installed the NGINX controller with the `--enable-ssl-passthrough=true` flag, and because NGINX is an exceptionally robust choice for this kind of routing, it will automatically recognize the Gateway ingress resource and pass the raw TCP connection directly to the pods. 
+
+No additional manual services are required. Ensure your Gateway ingress resource contains this specific annotation:
+`nginx.ingress.kubernetes.io/ssl-passthrough: "true"`
+
+:::

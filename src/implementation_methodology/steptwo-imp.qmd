@@ -337,6 +337,8 @@ spec:
           external-dns.alpha.kubernetes.io/ttl: "300"
           kubernetes.io/ingress.class: "nginx"
           nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          # in the lab, this allows the gateway to directly route to the backend without terminating TLS, which simplifies the trust configuration with self-signed certs. In production, you would typically terminate at the ALB and not use passthrough.
+          nginx.ingress.kubernetes.io/ssl-passthrough: "true"
           alb.ingress.kubernetes.io/scheme: "internal"
           alb.ingress.kubernetes.io/target-type: "ip"
           alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"

@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2026-02-24">
+<meta name="dcterms.date" content="2026-02-25">
 
 <title>Phase 1: Foundation &amp; Prerequisite Configuration – EEM on EKS</title>
 <style>
@@ -281,7 +281,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">February 24, 2026</p>
+      <p class="date">February 25, 2026</p>
     </div>
   </div>
   
@@ -313,10 +313,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="tab-content">
 <div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
 <p>On standard Kubernetes platforms, utilize an existing Certificate Manager installation.</p>
-<p><strong>Requirements:</strong><br>
-* <strong>Version:</strong> v1.12+ recommended.<br>
-* <strong>APIs:</strong> Must support <code>Issuer.cert-manager.io/v1</code> and <code>Certificate.cert-manager.io/v1</code> GroupVersionKinds (GVK).<br>
-* <strong>Alternative:</strong> If Cert-Manager is not allowed, you must manually create certificates for all components and provide them via Kubernetes secrets (complex).</p>
+<p><strong>Requirements:</strong></p>
+<ul>
+<li><strong>Version:</strong> v1.12+ recommended.<br>
+</li>
+<li><strong>APIs:</strong> Must support <code>Issuer.cert-manager.io/v1</code> and <code>Certificate.cert-manager.io/v1</code> GroupVersionKinds (GVK).<br>
+</li>
+<li><strong>Alternative:</strong> If Cert-Manager is not allowed, you must manually create certificates for all components and provide them via Kubernetes secrets (complex).</li>
+</ul>
 </div>
 <div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
 <p>For lab environments (e.g., k3s) where Cert-Manager is not yet present, install it via Helm.</p>

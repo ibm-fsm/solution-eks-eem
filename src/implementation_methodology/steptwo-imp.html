@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2026-02-24">
+<meta name="dcterms.date" content="2026-02-25">
 
 <title>Phase 2: EEM Deployment – EEM on EKS</title>
 <style>
@@ -280,7 +280,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">February 24, 2026</p>
+      <p class="date">February 25, 2026</p>
     </div>
   </div>
   
@@ -585,29 +585,31 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb13-60"><a href="#cb13-60" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">external-dns.alpha.kubernetes.io/ttl</span><span class="kw">:</span><span class="at"> </span><span class="st">"300"</span></span>
 <span id="cb13-61"><a href="#cb13-61" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"nginx"</span></span>
 <span id="cb13-62"><a href="#cb13-62" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">nginx.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
-<span id="cb13-63"><a href="#cb13-63" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
-<span id="cb13-64"><a href="#cb13-64" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
-<span id="cb13-65"><a href="#cb13-65" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/healthcheck-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
-<span id="cb13-66"><a href="#cb13-66" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
-<span id="cb13-67"><a href="#cb13-67" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/subnets</span><span class="kw">:</span><span class="at"> </span><span class="st">"subnet-xxxx, subnet-yyyy, subnet-zzzz"</span></span>
-<span id="cb13-68"><a href="#cb13-68" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/security-groups</span><span class="kw">:</span><span class="at"> </span><span class="st">"eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"</span></span>
-<span id="cb13-69"><a href="#cb13-69" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/tags</span><span class="kw">:</span><span class="at"> </span><span class="st">"Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"</span></span>
-<span id="cb13-70"><a href="#cb13-70" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">authConfig</span><span class="kw">:</span></span>
-<span id="cb13-71"><a href="#cb13-71" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">authType</span><span class="kw">:</span><span class="at"> OIDC</span></span>
-<span id="cb13-72"><a href="#cb13-72" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">oidcConfig</span><span class="kw">:</span></span>
-<span id="cb13-73"><a href="#cb13-73" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">clientIDKey</span><span class="kw">:</span><span class="at"> client-id</span></span>
-<span id="cb13-74"><a href="#cb13-74" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">clientSecretKey</span><span class="kw">:</span><span class="at"> client-secret</span></span>
-<span id="cb13-75"><a href="#cb13-75" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">discovery</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
-<span id="cb13-76"><a href="#cb13-76" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">secretName</span><span class="kw">:</span><span class="at"> oidc-client-secret</span></span>
-<span id="cb13-77"><a href="#cb13-77" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">site</span><span class="kw">:</span><span class="at"> </span><span class="st">'https://keycloak.my-haproxy.gym.lan/realms/eem-portal'</span></span>
-<span id="cb13-78"><a href="#cb13-78" aria-hidden="true" tabindex="-1"></a><span class="co">    # Mount the custom CA cert to trust Keycloak</span></span>
-<span id="cb13-79"><a href="#cb13-79" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">tls</span><span class="kw">:</span></span>
-<span id="cb13-80"><a href="#cb13-80" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">trustedCertificates</span><span class="kw">:</span></span>
-<span id="cb13-81"><a href="#cb13-81" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">certificate</span><span class="kw">:</span><span class="at"> ca.crt</span></span>
-<span id="cb13-82"><a href="#cb13-82" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">secretName</span><span class="kw">:</span><span class="at"> keycloak-trust-secret</span></span>
-<span id="cb13-83"><a href="#cb13-83" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">storage</span><span class="kw">:</span></span>
-<span id="cb13-84"><a href="#cb13-84" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">storageClassName</span><span class="kw">:</span><span class="at"> local-path</span></span>
-<span id="cb13-85"><a href="#cb13-85" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">type</span><span class="kw">:</span><span class="at"> persistent-claim</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb13-63"><a href="#cb13-63" aria-hidden="true" tabindex="-1"></a><span class="co">          # in the lab, this allows the gateway to directly route to the backend without terminating TLS, which simplifies the trust configuration with self-signed certs. In production, you would typically terminate at the ALB and not use passthrough.</span></span>
+<span id="cb13-64"><a href="#cb13-64" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">nginx.ingress.kubernetes.io/ssl-passthrough</span><span class="kw">:</span><span class="at"> </span><span class="st">"true"</span></span>
+<span id="cb13-65"><a href="#cb13-65" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
+<span id="cb13-66"><a href="#cb13-66" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
+<span id="cb13-67"><a href="#cb13-67" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/healthcheck-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb13-68"><a href="#cb13-68" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/backend-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"HTTPS"</span></span>
+<span id="cb13-69"><a href="#cb13-69" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/subnets</span><span class="kw">:</span><span class="at"> </span><span class="st">"subnet-xxxx, subnet-yyyy, subnet-zzzz"</span></span>
+<span id="cb13-70"><a href="#cb13-70" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/security-groups</span><span class="kw">:</span><span class="at"> </span><span class="st">"eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"</span></span>
+<span id="cb13-71"><a href="#cb13-71" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">alb.ingress.kubernetes.io/tags</span><span class="kw">:</span><span class="at"> </span><span class="st">"Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"</span></span>
+<span id="cb13-72"><a href="#cb13-72" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">authConfig</span><span class="kw">:</span></span>
+<span id="cb13-73"><a href="#cb13-73" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">authType</span><span class="kw">:</span><span class="at"> OIDC</span></span>
+<span id="cb13-74"><a href="#cb13-74" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">oidcConfig</span><span class="kw">:</span></span>
+<span id="cb13-75"><a href="#cb13-75" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">clientIDKey</span><span class="kw">:</span><span class="at"> client-id</span></span>
+<span id="cb13-76"><a href="#cb13-76" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">clientSecretKey</span><span class="kw">:</span><span class="at"> client-secret</span></span>
+<span id="cb13-77"><a href="#cb13-77" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">discovery</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb13-78"><a href="#cb13-78" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">secretName</span><span class="kw">:</span><span class="at"> oidc-client-secret</span></span>
+<span id="cb13-79"><a href="#cb13-79" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">site</span><span class="kw">:</span><span class="at"> </span><span class="st">'https://keycloak.my-haproxy.gym.lan/realms/eem-portal'</span></span>
+<span id="cb13-80"><a href="#cb13-80" aria-hidden="true" tabindex="-1"></a><span class="co">    # Mount the custom CA cert to trust Keycloak</span></span>
+<span id="cb13-81"><a href="#cb13-81" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">tls</span><span class="kw">:</span></span>
+<span id="cb13-82"><a href="#cb13-82" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">trustedCertificates</span><span class="kw">:</span></span>
+<span id="cb13-83"><a href="#cb13-83" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">certificate</span><span class="kw">:</span><span class="at"> ca.crt</span></span>
+<span id="cb13-84"><a href="#cb13-84" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">secretName</span><span class="kw">:</span><span class="at"> keycloak-trust-secret</span></span>
+<span id="cb13-85"><a href="#cb13-85" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">storage</span><span class="kw">:</span></span>
+<span id="cb13-86"><a href="#cb13-86" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">storageClassName</span><span class="kw">:</span><span class="at"> local-path</span></span>
+<span id="cb13-87"><a href="#cb13-87" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">type</span><span class="kw">:</span><span class="at"> persistent-claim</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><strong>Apply the Configuration:</strong></p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> apply <span class="at">-f</span> eem-instance.yaml</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>

@@ -7,3 +7,30 @@ date: last-modified
 <span class="dot">MD</span> &ensp;Mat Davis&ensp;
 ```
 <br>
+
+## Enabling Debug Logging in the EEM Manager
+
+To get more visibility into UI parsing and backend validation errors, you can dynamically enable debug logging for the core IBM EEM packages without restarting the manager pod.
+
+**1. Apply the Trace Specification Patch**
+Assuming your instance is named `eem-manager`, run the following command to inject the trace specification:
+
+```bash
+kubectl patch eventendpointmanagement eem-manager -n ibm-eem --type=merge -p '{"spec":{"manager":{"traceSpec":"com.ibm.ei:debug"}}}'
+
+```
+
+**2. Verify the Configuration**
+Tail the manager logs to confirm the configuration was picked up dynamically:
+
+```bash
+kubectl logs -l app.kubernetes.io/instance=eem-manager -n ibm-eem -c manager -f
+
+```
+
+You should see a confirmation message similar to this:
+```text
+INFO  NULL com.ibm.ei.core.config.TraceSpecConfig - [applyLoggers:69] Setting trace specification from spec variable traceSpec: com.ibm.ei:debug
+
+
+```

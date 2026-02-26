@@ -25,39 +25,76 @@ Ensure you have the following information from your Kafka administrators:
 * Authentication credentials (SCRAM, mTLS, or plain).  
 
 ## Option B: Lab (Test Broker)
-**Use Case:** Spinning up a temporary, lightweight Kafka broker in your k3s environment to validate Gateway routing.
+**Use Case:** Spinning up a temporary, lightweight Kafka broker in your k3s environment to validate Gateway routing with secure SSL connections (but without the complexity of Mutual TLS).
 
-We can deploy a simple, single-node Kafka instance using the Bitnami Helm chart.
+We can deploy a single-node Kafka instance using the Bitnami Helm chart, secured by a local Certificate Authority.
+
+**1. Generate the Local Certificates**
+First, create the SSL certificates to secure the broker traffic:
 
 ```bash
-# 1. Add the Bitnami repository
+# Create the Certificate Authority
+openssl req -x509 -newkey rsa:4096 -days 365 -nodes -keyout ca.key -out ca.crt -subj "/CN=Kafka-Lab-CA"
+
+# Create the Server Private Key and CSR
+openssl req -newkey rsa:2048 -nodes -keyout server.key -out server.csr -subj "/CN=test-kafka.kafka-lab.svc.cluster.local"
+
+# Define the Subject Alternative Names (SANs) for internal DNS
+echo "subjectAltName=DNS:test-kafka.kafka-lab.svc.cluster.local,DNS:test-kafka.kafka-lab.svc,DNS:localhost" > extfile.cnf
+
+# Sign the Server Certificate
+openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 365 -extfile extfile.cnf
+
+# Load the certificates into a Kubernetes Secret
+kubectl create namespace kafka-lab
+kubectl create secret generic kafka-server-certs -n kafka-lab \
+  --from-file=tls.crt=server.crt \
+  --from-file=tls.key=server.key \
+  --from-file=ca.crt=ca.crt
+```
+
+**2. Deploy the Secure Broker**
+Now, deploy the broker using the secret we just created. We explicitly set `tls.clientAuth=none` to enforce one-way SSL, bypassing the Mutual TLS (mTLS) requirement.
+
+```bash
+# Add the Bitnami repository
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo update
 
-# 2. Install a basic Kafka cluster in a new namespace
+# Install the secure Kafka cluster
 helm install test-kafka bitnami/kafka \
   --namespace kafka-lab \
-  --create-namespace \
   --set replicaCount=1 \
   --set zookeeper.enabled=false \
   --set kraft.enabled=true \
-  --set listeners.client.protocol=PLAINTEXT \
+  --set listeners.client.protocol=SSL \
+  --set tls.enabled=true \
+  --set tls.type=pem \
+  --set tls.existingSecret=kafka-server-certs \
+  --set listeners.client.sslClientAuth=none \
   --set image.repository=bitnamilegacy/kafka
 ```
-*Note: This creates a plaintext broker at `test-kafka.kafka-lab.svc.cluster.local:9092` which is perfect for internal Gateway testing.*
+*Note: This creates a secure broker at `test-kafka.kafka-lab.svc.cluster.local:9092` that encrypts traffic but does not require clients to present their own certificates.*
 
-**Create the Backend Topic**  
-If you are using the temporary Bitnami broker, you need to create a test topic on the Kafka instance itself before EEM can proxy it. Run this command to create a topic named `test-topic`:
+**3. Create the Backend Topic** Because the broker is now expecting secure connections, we must pass a configuration file to the Kafka script so it knows to use SSL when connecting to create the topic. 
+
+Run this command to dynamically generate the client configuration inside the pod and create a topic named `test-topic`:
 
 ```bash
-kubectl exec -it test-kafka-controller-0 -n kafka-lab -- kafka-topics.sh \
+TRUST_PASS=$(kubectl get secret test-kafka-tls-passwords -n kafka-lab -o jsonpath='{.data.truststore-password}' | base64 -d) && \
+kubectl exec -it test-kafka-controller-0 -n kafka-lab -- bash -c " \
+  echo -e \"security.protocol=SSL
+ssl.truststore.location=/opt/bitnami/kafka/config/certs/kafka.truststore.jks
+ssl.truststore.password=$TRUST_PASS
+ssl.endpoint.identification.algorithm=\" > /tmp/client.properties && \
+  kafka-topics.sh \
   --create \
-  --bootstrap-server localhost:9092 \
+  --bootstrap-server test-kafka.kafka-lab.svc.cluster.local:9092 \
   --topic test-topic \
   --partitions 1 \
-  --replication-factor 1
+  --replication-factor 1 \
+  --command-config /tmp/client.properties"
 ```
-
 :::
 
 ### 3.2 Connect the Backend Kafka Cluster
@@ -70,9 +107,11 @@ Once the Gateway is connected, you must tell it where to route the Kafka traffic
 **Use Case:** Connecting to AWS MSK, Confluent, or Event Streams.
 
 1. Navigate to the **Clusters** page in the EEM UI.  
-2. Click **Add cluster**.  
-3. Provide your production Bootstrap Server address and upload the required TLS certificates or SCRAM credentials provided by your Kafka administrator.  
-4. Select the Gateway you registered in Step 4 to handle the routing.  
+2. Click **Add cluster**.
+3. Enter a name (e.g., `test-kafka-cluster`).  
+4. Enter the DNS name and port for the bootstrap server: `kafka.corp:443`.  
+5. If certificates are set up for the Kafka broker, an error will display saying "Multiple certificates are not trusted". Click "Accept all certificates". Click Next.
+6. On the Credentials screen, enter any client authentication needed. Click create to finish adding the cluster. 
 
 ## Option B: Lab (Bitnami Test Broker)
 **Use Case:** Connecting to the plaintext Bitnami broker we spun up in the `kafka-lab` namespace.
@@ -81,8 +120,8 @@ Once the Gateway is connected, you must tell it where to route the Kafka traffic
 2. Click **Add cluster**.  
 3. Enter a name (e.g., `test-kafka-cluster`).  
 4. Enter the internal Kubernetes DNS name for the bootstrap server: `test-kafka.kafka-lab.svc.cluster.local:9092`.  
-5. For Security Protocol, select **PLAINTEXT** since this is an internal, non-secure test broker.  
-6. Select the Gateway you registered in Step 4 to associate it with this cluster.  
+5. If certificates are set up for the Kafka cluster, you will be prompted to accept the certificates. Click Next.
+6. On the Credentials screen, since we configured the broker for one-way SSL without client authentication. Click create to finish adding the cluster.
 
 :::
 

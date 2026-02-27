@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2026-02-26">
+<meta name="dcterms.date" content="2026-02-27">
 
 <title>Deployment Readiness – EEM on EKS</title>
 <style>
@@ -259,7 +259,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#prerequisite-checklist" id="toc-prerequisite-checklist" class="nav-link active" data-scroll-target="#prerequisite-checklist">Prerequisite Checklist</a>
   <ul class="collapse">
   <li><a href="#workstation-tooling" id="toc-workstation-tooling" class="nav-link" data-scroll-target="#workstation-tooling">1. Workstation &amp; Tooling</a></li>
-  <li><a href="#ingress-strategy-ssl-passthrough" id="toc-ingress-strategy-ssl-passthrough" class="nav-link" data-scroll-target="#ingress-strategy-ssl-passthrough">2. Ingress Strategy (SSL Passthrough)</a></li>
+  <li><a href="#ingress-and-load-balancer-strategy" id="toc-ingress-and-load-balancer-strategy" class="nav-link" data-scroll-target="#ingress-and-load-balancer-strategy">2. Ingress and Load Balancer Strategy</a></li>
   <li><a href="#identity-provider-oidc" id="toc-identity-provider-oidc" class="nav-link" data-scroll-target="#identity-provider-oidc">3. Identity Provider (OIDC)</a></li>
   <li><a href="#supply-chain-image-mirroring" id="toc-supply-chain-image-mirroring" class="nav-link" data-scroll-target="#supply-chain-image-mirroring">4. Supply Chain (Image Mirroring)</a></li>
   <li><a href="#cluster-services-cert-manager" id="toc-cluster-services-cert-manager" class="nav-link" data-scroll-target="#cluster-services-cert-manager">5. Cluster Services (Cert-Manager)</a></li>
@@ -284,7 +284,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">February 26, 2026</p>
+      <p class="date">February 27, 2026</p>
     </div>
   </div>
   
@@ -339,13 +339,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </div>
 </section>
-<section id="ingress-strategy-ssl-passthrough" class="level3">
-<h3 class="anchored" data-anchor-id="ingress-strategy-ssl-passthrough">2. Ingress Strategy (SSL Passthrough)</h3>
-<p>The Event Gateway component requires a specialized ingress configuration to handle the Kafka protocol correctly. While standard TLS termination works for the API Manager and Portal, the Gateway often requires direct TCP access for protocol handling and client certificate verification.</p>
-<p><strong>Requirement: Ingress Controller with SSL Passthrough</strong> The cluster must have an Ingress Controller installed that supports <strong>SSL Passthrough</strong>.</p>
+<section id="ingress-and-load-balancer-strategy" class="level3">
+<h3 class="anchored" data-anchor-id="ingress-and-load-balancer-strategy">2. Ingress and Load Balancer Strategy</h3>
+<p>The EEM components require a split load balancing strategy to handle standard web traffic and the specialized Kafka protocol correctly. While standard TLS termination works perfectly for the Manager and UI, the Event Gateway requires direct TCP access to facilitate SSL passthrough for client certificate verification.</p>
+<p><strong>Requirement: Split AWS Load Balancers or SSL Passthrough</strong></p>
+<p>To accommodate these distinct routing needs, the cluster must be configured using one of the following approaches:</p>
 <ul>
-<li><strong>Controller Selection:</strong> While NGINX is a common choice, any Ingress Controller that supports the SSL Passthrough annotation/configuration is acceptable.</li>
-<li><strong>Load Balancer:</strong> The Ingress Service must be backed by an <strong>AWS Network Load Balancer (NLB)</strong> (Layer 4) rather than a Classic ELB or ALB (Layer 7). This ensures that the TCP stream reaches the controller without premature termination or header modification.</li>
+<li><strong>EEM Manager (ALB):</strong> The UI and API endpoints exclusively use HTTP/HTTPS. These are fully supported by standard Kubernetes <code>Ingress</code> resources backed by an AWS Application Load Balancer (ALB).</li>
+<li><strong>Event Gateway (NLB):</strong> When gateway groups are defined, SSL passthrough is mandatory. Because ALBs do not support this feature, you must deploy a Kubernetes <code>Service</code> (type <code>LoadBalancer</code>) configured to provision an AWS Network Load Balancer (NLB). The gateway will also automatically generate an <code>Ingress</code> resource, but the resulting ALB path can be ignored.</li>
+<li><strong>In-Cluster Controller Option:</strong> If you have the option to deploy a dedicated in-cluster ingress controller rather than relying entirely on AWS native routing, this is an option. Ensure the controller is exposed via a Layer 4 NLB and is configured to allow SSL passthrough.</li>
 </ul>
 </section>
 <section id="identity-provider-oidc" class="level3">

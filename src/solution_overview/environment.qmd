@@ -8,8 +8,64 @@ date: last-modified
 ```
 <br>
 
-Phasellus at risus egestas, ultricies tortor efficitur, auctor augue. Suspendisse finibus maximus dui nec condimentum. Proin fringilla efficitur vehicula. Suspendisse sem lacus, iaculis quis erat et, facilisis sagittis est. Sed sapien justo, condimentum vitae aliquet sed, faucibus at ex. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Fusce placerat ante eget diam tincidunt, vitae tincidunt sapien malesuada. Nullam ullamcorper justo eros. Duis ultricies aliquam dui, id aliquam lorem congue vitae. Ut porttitor, tellus eu dignissim semper, turpis nunc cursus libero, sed placerat est dui non enim.
+```{mermaid}
+graph TD
+    %% External Entities
+    WebClient[Web Users / API Clients]
+    KafkaClient[External Kafka Clients]
 
-Vestibulum libero dolor, vehicula vitae risus non, consequat gravida neque. Maecenas a posuere sem. Quisque dignissim porta pretium. Nam mattis lacus commodo lobortis consequat. Vestibulum at massa a quam egestas accumsan. Fusce ac neque eu libero maximus aliquet id quis metus. In sodales neque ut turpis iaculis vehicula. Sed volutpat, tellus non laoreet aliquet, risus felis ornare dolor, interdum venenatis turpis metus in lorem. Aliquam quam ligula, porttitor non ultrices ac, lacinia ullamcorper massa. Integer molestie eleifend urna, imperdiet dignissim tellus malesuada ac. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam tristique sem ac purus interdum, vitae pharetra erat fringilla. Integer non nunc a eros porttitor rutrum. Suspendisse ut libero urna. Vestibulum vitae est at diam vestibulum aliquet. Donec porta nunc eget lobortis mollis.
+    subgraph AWS[AWS Cloud]
+        ALB[AWS Application Load Balancer<br>HTTP / HTTPS]
+        NLB[AWS Network Load Balancer<br>TCP / SSL Passthrough]
+    end
 
-Vestibulum luctus sodales odio, at luctus lacus lobortis a. Aliquam vulputate id turpis sit amet bibendum. Donec a dignissim tellus, vel vehicula erat. Pellentesque hendrerit ex magna, at dictum est pretium a. Vivamus faucibus ipsum lectus, ut elementum diam interdum scelerisque. Cras magna sapien, tincidunt quis eleifend at, tincidunt non eros. Aliquam ac augue turpis.
+    subgraph EKS[EKS Cluster]
+        
+        subgraph ManagerGroup[EEM Manager]
+            IngressUI["Ingress: Manager (Console)"]
+            IngressAPI[Ingress: Server]
+            IngressAdmin[Ingress: Admin]
+            IngressAuth[Ingress: Gateway]
+            MgrPods((Manager Pod))
+            
+            IngressUI --> MgrPods
+            IngressAPI --> MgrPods
+            IngressAdmin --> MgrPods
+            IngressAuth --> MgrPods
+        end
+
+        subgraph GatewayGrp[Gateway Group]
+            GwService[Service: LoadBalancer]
+            GwIngress[Ingress: Gateway<br>Ignored Path]
+            GwPods((Gateway Pod))
+            
+            GwService --> GwPods
+            GwIngress -.->|Ignored| GwPods
+        end
+        
+        Kafka[(Internal Kafka Brokers)]
+    end
+
+    %% Client Routing to Load Balancers
+    WebClient -->|HTTPS| ALB
+    KafkaClient -->|Kafka Protocol / mTLS| NLB
+
+    %% Load Balancer Routing to Kubernetes Resources
+    ALB --> IngressUI
+    ALB --> IngressAPI
+    ALB --> IngressAdmin
+    ALB --> IngressAuth
+    
+    %% The generated but unused path
+    ALB -.->|Unused / Bypassed| GwIngress
+
+    %% NLB Routing
+    NLB -->|SSL Passthrough| GwService
+
+    %% Internal Gateway to Kafka Routing
+    GwPods -->|TCP| Kafka
+    
+    %% Styling for ignored components
+    classDef ignored stroke-dasharray: 5 5, fill:#eee, color:#999, stroke:#999;
+    class GwIngress ignored;
+```

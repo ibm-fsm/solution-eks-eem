@@ -178,7 +178,7 @@ Creating a dummy `ibm-entitlement-key` secret when anonymous access is allowed w
 Create a secret using your IBM Entitlement Key.
 
 ```bash
-# 1. Get your key from [https://myibm.ibm.com/products-services/containerlibrary](https://myibm.ibm.com/products-services/containerlibrary)
+# 1. Get your key from https://myibm.ibm.com/products-services/containerlibrary
 # 2. Create the secret
 kubectl create secret docker-registry ibm-entitlement-key \
   --docker-server=cp.icr.io \

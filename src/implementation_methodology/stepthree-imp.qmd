@@ -19,12 +19,13 @@ The EEM Gateway acts as a secure proxy and requires a target Kafka cluster to ma
 ## Option A: Production (Bring Your Own Kafka)
 **Use Case:** Connecting to an existing enterprise Kafka environment (e.g., AWS MSK, Confluent Cloud, or IBM Event Streams).
 
-Ensure you have the following information from your Kafka administrators:  
+Ensure you have the following information from your Kafka administrators:
+
 * Bootstrap server addresses.  
 * TLS certificates (if using secure connections).  
 * Authentication credentials (SCRAM, mTLS, or plain).  
 
-## Option B: Lab (Test Broker)
+## Option B: Lab (Bitnami)
 **Use Case:** Spinning up a temporary, lightweight Kafka broker in your k3s environment to validate Gateway routing with secure SSL connections (but without the complexity of Mutual TLS).
 
 We can deploy a single-node Kafka instance using the Bitnami Helm chart, secured by a local Certificate Authority.
@@ -94,6 +95,133 @@ ssl.endpoint.identification.algorithm=\" > /tmp/client.properties && \
   --partitions 1 \
   --replication-factor 1 \
   --command-config /tmp/client.properties"
+```
+
+## Option C: Lab (Strimzi Operator)
+**Use Case:** Deploying a production-grade (but single-node) Kafka 4.1.0 cluster on EKS using the Strimzi Operator. This setup enforces **Mutual TLS (mTLS)** for all connections and uses internal ClusterIP networking for simplified lab testing.
+
+**1. Install the Strimzi Operator**
+Before creating a Kafka cluster, you must install the operator that manages the Kafka custom resources.
+
+```bash
+# Add the Strimzi Helm repository
+helm repo add strimzi https://strimzi.io/charts/
+helm repo update
+
+# Create the lab namespace and install the operator
+helm install strimzi-kafka-operator strimzi/strimzi-kafka-operator \
+  --namespace kafka-lab \
+  --create-namespace
+```
+
+**2. Deploy the Kafka 4.1.0 Cluster**
+We will now define a `Kafka` custom resource. This configuration uses **KRaft** mode (no Zookeeper), enables **mTLS** on the internal listener, and targets **Kafka v4.1.0**. Strimzi will automatically generate the internal CAs and certificates for you.
+
+Create a file named `kafka-lab.yaml`:
+
+```yaml
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: lab-pool
+  namespace: kafka-lab
+  labels:
+    strimzi.io/cluster: lab-broker
+spec:
+  replicas: 1
+  roles:
+    - controller
+    - broker
+  storage:
+    type: jbod
+    volumes:
+      - id: 0
+        type: persistent-claim
+        size: 10Gi
+        deleteClaim: true
+        class: gp2
+---
+apiVersion: kafka.strimzi.io/v1
+kind: Kafka
+metadata:
+  name: lab-broker
+  namespace: kafka-lab
+  annotations:
+    strimzi.io/node-pools: enabled
+spec:
+  kafka:
+    version: 4.1.0
+    metadataVersion: 4.1-IV0
+    listeners:
+      - name: tls
+        port: 9093
+        type: internal
+        tls: true
+        authentication:
+          type: tls
+    config:
+      ssl.enabled.protocols: "TLSv1.3"
+      ssl.protocol: "TLSv1.3"
+      ssl.cipher.suites: "TLS_AES_256_GCM_SHA384"          
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}
+```
+
+Apply the manifest:
+```bash
+kubectl apply -f kafka-lab.yaml
+```
+
+**3. Create a User for mTLS Authentication**
+Since mTLS is enabled, the client must present a certificate signed by the Cluster CA. Strimzi’s `KafkaUser` resource automates this by creating a Kubernetes secret containing the user's private key and signed certificate.
+
+```yaml
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaUser
+metadata:
+  name: lab-user
+  namespace: kafka-lab
+  labels:
+    strimzi.io/cluster: lab-broker
+spec:
+  authentication:
+    type: tls
+```
+
+Apply the user manifest:
+```bash
+kubectl apply -f kafka-user.yaml
+```
+
+**4. Create a Topic and Test Connection**
+Because we are using internal networking, the broker address is `lab-broker-kafka-bootstrap.kafka-lab.svc.cluster.local:9093`. To create a topic, we will use the operator's `KafkaTopic` resource.
+
+```yaml
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: test-topic
+  namespace: kafka-lab
+  labels:
+    strimzi.io/cluster: lab-broker
+spec:
+  partitions: 1
+  replicas: 1
+```
+
+Apply the topic manifest:
+```bash
+kubectl apply -f kafka-topic.yaml
+```
+
+**5. Extract Credentials for EEM Gateway**
+When you configure your EEM Gateway to point to this backend, you will need the User certificate/key (to authenticate).
+
+```bash
+# Get the User Cert and Key (to be added to Gateway Keystore)
+kubectl get secret lab-user -n kafka-lab -o jsonpath='{.data.user\.crt}' | base64 -d > user.crt
+kubectl get secret lab-user -n kafka-lab -o jsonpath='{.data.user\.key}' | base64 -d > user.key
 ```
 :::
 

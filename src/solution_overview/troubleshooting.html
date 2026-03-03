@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2026-02-27">
+<meta name="dcterms.date" content="2026-03-03">
 
 <title>Troubleshooting &amp; Diagnostics – EEM on EKS</title>
 <style>
@@ -276,7 +276,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">February 27, 2026</p>
+      <p class="date">March 3, 2026</p>
     </div>
   </div>
   
@@ -292,13 +292,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p><br></p>
 <section id="enabling-debug-logging-in-the-eem-manager" class="level2">
 <h2 class="anchored" data-anchor-id="enabling-debug-logging-in-the-eem-manager">Enabling Debug Logging in the EEM Manager</h2>
-<p>To get more visibility into UI parsing and backend validation errors, you can dynamically enable debug logging for the core IBM EEM packages without restarting the manager pod.</p>
-<p><strong>1. Apply the Trace Specification Patch</strong> Assuming your instance is named <code>eem-manager</code>, run the following command to inject the trace specification:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> patch eventendpointmanagement eem-manager <span class="at">-n</span> ibm-eem <span class="at">--type</span><span class="op">=</span>merge <span class="at">-p</span> <span class="st">'{"spec":{"manager":{"traceSpec":"com.ibm.ei:debug"}}}'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><strong>2. Verify the Configuration</strong> Tail the manager logs to confirm the configuration was picked up dynamically:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> logs <span class="at">-l</span> app.kubernetes.io/instance=eem-manager <span class="at">-n</span> ibm-eem <span class="at">-c</span> manager <span class="at">-f</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>You should see a confirmation message similar to this:</p>
-<pre class="text"><code>INFO  NULL com.ibm.ei.core.config.TraceSpecConfig - [applyLoggers:69] Setting trace specification from spec variable traceSpec: com.ibm.ei:debug
+<p>To get more visibility into UI parsing, backend validation errors, and low-level TLS handshake failures, you can enable debug logging for the core IBM EEM packages and the underlying Netty SSL handlers.</p>
+<p>Because EEM uses Vert.x and Netty for its high-performance networking, standard Java SSL debug flags (like <code>-Djavax.net.debug=all</code>) will not capture the TLS handshakes. Instead, you must enable tracing for the <code>io.netty.handler.ssl</code> package directly.</p>
+<p><strong>1. Apply the Trace Specification Patch</strong> Assuming your instance is named <code>eem-manager</code>, run the following command to inject the trace specification for both the application logic and the Netty SSL handlers:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> patch eventendpointmanagement eem-manager <span class="at">-n</span> ibm-eem <span class="at">--type</span><span class="op">=</span>merge <span class="at">-p</span> <span class="st">'{"spec":{"manager":{"traceSpec":"com.ibm.ei:debug,io.netty.handler.ssl:debug"}}}'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>2. Force a Pod Restart</strong> While the <code>traceSpec</code> field is designed to hot-reload dynamically, it is often necessary to force a clean restart of the manager pods to fully apply configuration changes or clear hung network states. Rather than manually editing the pod template, use the standard rollout command to gracefully restart the StatefulSet:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> rollout restart statefulset eem-manager-ibm-eem-manager <span class="at">-n</span> ibm-eem</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>3. Verify the Configuration</strong> Once the new pod comes up, tail the manager logs to confirm the configuration was successfully applied:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> logs <span class="at">-l</span> app.kubernetes.io/instance=eem-manager <span class="at">-n</span> ibm-eem <span class="at">-c</span> manager <span class="at">-f</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>You should see a confirmation message indicating the loggers were set:</p>
+<pre class="text"><code>INFO  NULL com.ibm.ei.core.config.TraceSpecConfig - [applyLoggers:69] Setting trace specification from spec variable traceSpec: com.ibm.ei:debug,io.netty.handler.ssl:debug
 
 </code></pre>
 

@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2026-02-27">
+<meta name="dcterms.date" content="2026-03-03">
 
 <title>Environment Architecture – EEM on EKS</title>
 <style>
@@ -71,6 +71,9 @@ ul.task-list li input[type="checkbox"] {
     "search-label": "Search"
   }
 }</script>
+<script src="../../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
 
 
 </head>
@@ -235,7 +238,7 @@ ul.task-list li input[type="checkbox"] {
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">February 27, 2026</p>
+      <p class="date">March 3, 2026</p>
     </div>
   </div>
   
@@ -249,9 +252,76 @@ ul.task-list li input[type="checkbox"] {
 
 <span class="dot">MD</span>  Mat Davis 
 <p><br></p>
-<p>Phasellus at risus egestas, ultricies tortor efficitur, auctor augue. Suspendisse finibus maximus dui nec condimentum. Proin fringilla efficitur vehicula. Suspendisse sem lacus, iaculis quis erat et, facilisis sagittis est. Sed sapien justo, condimentum vitae aliquet sed, faucibus at ex. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Fusce placerat ante eget diam tincidunt, vitae tincidunt sapien malesuada. Nullam ullamcorper justo eros. Duis ultricies aliquam dui, id aliquam lorem congue vitae. Ut porttitor, tellus eu dignissim semper, turpis nunc cursus libero, sed placerat est dui non enim.</p>
-<p>Vestibulum libero dolor, vehicula vitae risus non, consequat gravida neque. Maecenas a posuere sem. Quisque dignissim porta pretium. Nam mattis lacus commodo lobortis consequat. Vestibulum at massa a quam egestas accumsan. Fusce ac neque eu libero maximus aliquet id quis metus. In sodales neque ut turpis iaculis vehicula. Sed volutpat, tellus non laoreet aliquet, risus felis ornare dolor, interdum venenatis turpis metus in lorem. Aliquam quam ligula, porttitor non ultrices ac, lacinia ullamcorper massa. Integer molestie eleifend urna, imperdiet dignissim tellus malesuada ac. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam tristique sem ac purus interdum, vitae pharetra erat fringilla. Integer non nunc a eros porttitor rutrum. Suspendisse ut libero urna. Vestibulum vitae est at diam vestibulum aliquet. Donec porta nunc eget lobortis mollis.</p>
-<p>Vestibulum luctus sodales odio, at luctus lacus lobortis a. Aliquam vulputate id turpis sit amet bibendum. Donec a dignissim tellus, vel vehicula erat. Pellentesque hendrerit ex magna, at dictum est pretium a. Vivamus faucibus ipsum lectus, ut elementum diam interdum scelerisque. Cras magna sapien, tincidunt quis eleifend at, tincidunt non eros. Aliquam ac augue turpis.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    %% External Entities
+    WebClient[Web Users / API Clients]
+    KafkaClient[External Kafka Clients]
+
+    subgraph AWS[AWS Cloud]
+        ALB[AWS Application Load Balancer&lt;br&gt;HTTP / HTTPS]
+        NLB[AWS Network Load Balancer&lt;br&gt;TCP / SSL Passthrough]
+    end
+
+    subgraph EKS[EKS Cluster]
+        
+        subgraph ManagerGroup[EEM Manager]
+            IngressUI["Ingress: Manager (Console)"]
+            IngressAPI[Ingress: Server]
+            IngressAdmin[Ingress: Admin]
+            IngressAuth[Ingress: Gateway]
+            MgrPods((Manager Pod))
+            
+            IngressUI --&gt; MgrPods
+            IngressAPI --&gt; MgrPods
+            IngressAdmin --&gt; MgrPods
+            IngressAuth --&gt; MgrPods
+        end
+
+        subgraph GatewayGrp[Gateway Group]
+            GwService[Service: LoadBalancer]
+            GwIngress[Ingress: Gateway&lt;br&gt;Ignored Path]
+            GwPods((Gateway Pod))
+            
+            GwService --&gt; GwPods
+            GwIngress -.-&gt;|Ignored| GwPods
+        end
+        
+        Kafka[(Internal Kafka Brokers)]
+    end
+
+    %% Client Routing to Load Balancers
+    WebClient --&gt;|HTTPS| ALB
+    KafkaClient --&gt;|Kafka Protocol / mTLS| NLB
+
+    %% Load Balancer Routing to Kubernetes Resources
+    ALB --&gt; IngressUI
+    ALB --&gt; IngressAPI
+    ALB --&gt; IngressAdmin
+    ALB --&gt; IngressAuth
+    
+    %% The generated but unused path
+    ALB -.-&gt;|Unused / Bypassed| GwIngress
+
+    %% NLB Routing
+    NLB --&gt;|SSL Passthrough| GwService
+
+    %% Internal Gateway to Kafka Routing
+    GwPods --&gt;|TCP| Kafka
+    
+    %% Styling for ignored components
+    classDef ignored stroke-dasharray: 5 5, fill:#eee, color:#999, stroke:#999;
+    class GwIngress ignored;
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 
 
 

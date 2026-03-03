@@ -236,20 +236,36 @@ Once the Gateway is connected, you must tell it where to route the Kafka traffic
 
 1. Navigate to the **Clusters** page in the EEM UI.  
 2. Click **Add cluster**.
-3. Enter a name (e.g., `test-kafka-cluster`).  
+3. Enter a name (e.g., `prod-kafka-cluster`).  
 4. Enter the DNS name and port for the bootstrap server: `kafka.corp:443`.  
-5. If certificates are set up for the Kafka broker, an error will display saying "Multiple certificates are not trusted". Click "Accept all certificates". Click Next.
-6. On the Credentials screen, enter any client authentication needed. Click create to finish adding the cluster. 
+5. If certificates are set up for the Kafka broker, an error will display saying "Multiple certificates are not trusted". Click **Accept all certificates** and then click **Next**.
+6. If your enterprise broker requires Mutual TLS (mTLS), you will be prompted on the next screen to configure your client authentication. Upload your client certificate and private key, then click **Next**.
+7. On the **Credentials** screen, if your broker uses SASL, enter those credentials here. If authentication was completely handled by your mTLS client certificates, select **No credentials required**. 
+8. Click **Create** to finish adding the cluster. 
 
-## Option B: Lab (Bitnami Test Broker)
+## Option B: Lab (Bitnami)
 **Use Case:** Connecting to the plaintext Bitnami broker we spun up in the `kafka-lab` namespace.
 
 1. Navigate to the **Clusters** page in the EEM UI.  
 2. Click **Add cluster**.  
-3. Enter a name (e.g., `test-kafka-cluster`).  
+3. Enter a name (e.g., `bitnami-lab-cluster`).  
 4. Enter the internal Kubernetes DNS name for the bootstrap server: `test-kafka.kafka-lab.svc.cluster.local:9092`.  
-5. If certificates are set up for the Kafka cluster, you will be prompted to accept the certificates. Click Next.
-6. On the Credentials screen, since we configured the broker for one-way SSL without client authentication. Click create to finish adding the cluster.
+5. Because the broker is configured for one-way SSL, you will be prompted to accept the server certificates. Review and accept them, then click **Next**.
+6. Since this specific lab broker does not require client certificates, bypass the client certificate upload and click **Next**.
+7. On the **Credentials** screen, since we configured the broker without client authentication, select **No credentials required**. 
+8. Click **Create** to finish adding the cluster.
+
+## Option C: Lab (Strimzi)
+**Use Case:** Connecting to the Mutual TLS (mTLS) secured Strimzi broker we spun up in the `kafka-lab` namespace on EKS.
+
+1. Navigate to the **Clusters** page in the EEM Manager UI.  
+2. Click **Add cluster**.  
+3. Enter a name (e.g., `strimzi-lab-cluster`).  
+4. Enter the internal Kubernetes DNS name for the Strimzi TLS bootstrap server: `lab-broker-kafka-bootstrap.kafka-lab.svc.cluster.local:9093`.  
+5. EEM will detect the secure connection and prompt you to accept the server certificates provided by the Strimzi Cluster CA. Review and accept them, then click **Next**.
+6. On the following certificate screen, because the broker enforces mTLS, you will be prompted to provide your client certificates. Upload or paste the contents of the `user.crt` (Certificate) and `user.key` (Private Key) files you extracted earlier for the `lab-user`, then click **Next**.
+7. On the **Credentials** screen, select **No credentials required**, as authentication is fully handled by the client certificates you just provided.
+8. Click **Create** to finish adding the cluster and establish the secure connection.
 
 :::
 

@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2026-03-03">
+<meta name="dcterms.date" content="2026-03-04">
 
 <title>Phase 3: Gateway Deployment – EEM on EKS</title>
 <style>
@@ -279,7 +279,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">March 3, 2026</p>
+      <p class="date">March 4, 2026</p>
     </div>
   </div>
   
@@ -298,14 +298,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h3 class="anchored" data-anchor-id="backend-kafka-provisioning">3.1 Backend Kafka Provisioning</h3>
 <p>The EEM Gateway acts as a secure proxy and requires a target Kafka cluster to manage.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true" href="">Option A: Production (Bring Your Own Kafka)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false" href="">Option B: Lab (Test Broker)</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true" href="">Option A: Production (Bring Your Own Kafka)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false" href="">Option B: Lab (Bitnami)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-3" role="tab" aria-controls="tabset-1-3" aria-selected="false" href="">Option C: Lab (Strimzi Operator)</a></li></ul>
 <div class="tab-content">
 <div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
 <p><strong>Use Case:</strong> Connecting to an existing enterprise Kafka environment (e.g., AWS MSK, Confluent Cloud, or IBM Event Streams).</p>
-<p>Ensure you have the following information from your Kafka administrators:<br>
-* Bootstrap server addresses.<br>
-* TLS certificates (if using secure connections).<br>
-* Authentication credentials (SCRAM, mTLS, or plain).</p>
+<p>Ensure you have the following information from your Kafka administrators:</p>
+<ul>
+<li>Bootstrap server addresses.<br>
+</li>
+<li>TLS certificates (if using secure connections).<br>
+</li>
+<li>Authentication credentials (SCRAM, mTLS, or plain).</li>
+</ul>
 </div>
 <div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
 <p><strong>Use Case:</strong> Spinning up a temporary, lightweight Kafka broker in your k3s environment to validate Gateway routing with secure SSL connections (but without the complexity of Mutual TLS).</p>
@@ -363,6 +367,98 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="st">  --replication-factor 1 </span><span class="dt">\</span></span>
 <span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="st">  --command-config /tmp/client.properties"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<div id="tabset-1-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-3-tab">
+<p><strong>Use Case:</strong> Deploying a production-grade (but single-node) Kafka 4.1.0 cluster on EKS using the Strimzi Operator. This setup enforces <strong>Mutual TLS (mTLS)</strong> for all connections and uses internal ClusterIP networking for simplified lab testing.</p>
+<p><strong>1. Install the Strimzi Operator</strong> Before creating a Kafka cluster, you must install the operator that manages the Kafka custom resources.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Add the Strimzi Helm repository</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">helm</span> repo add strimzi https://strimzi.io/charts/</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="ex">helm</span> repo update</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Create the lab namespace and install the operator</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="ex">helm</span> install strimzi-kafka-operator strimzi/strimzi-kafka-operator <span class="dt">\</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> kafka-lab <span class="dt">\</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">--create-namespace</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>2. Deploy the Kafka 4.1.0 Cluster</strong> We will now define a <code>Kafka</code> custom resource. This configuration uses <strong>KRaft</strong> mode (no Zookeeper), enables <strong>mTLS</strong> on the internal listener, and targets <strong>Kafka v4.1.0</strong>. Strimzi will automatically generate the internal CAs and certificates for you.</p>
+<p>Create a file named <code>kafka-lab.yaml</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> kafka.strimzi.io/v1</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> KafkaNodePool</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> lab-pool</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">namespace</span><span class="kw">:</span><span class="at"> kafka-lab</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">labels</span><span class="kw">:</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">strimzi.io/cluster</span><span class="kw">:</span><span class="at"> lab-broker</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">replicas</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">roles</span><span class="kw">:</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> controller</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> broker</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">storage</span><span class="kw">:</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> jbod</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">volumes</span><span class="kw">:</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">id</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">type</span><span class="kw">:</span><span class="at"> persistent-claim</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">size</span><span class="kw">:</span><span class="at"> 10Gi</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">deleteClaim</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">class</span><span class="kw">:</span><span class="at"> gp2</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a><span class="pp">---</span></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> kafka.strimzi.io/v1</span></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> Kafka</span></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> lab-broker</span></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">namespace</span><span class="kw">:</span><span class="at"> kafka-lab</span></span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">strimzi.io/node-pools</span><span class="kw">:</span><span class="at"> enabled</span></span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">kafka</span><span class="kw">:</span></span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">version</span><span class="kw">:</span><span class="at"> </span><span class="fl">4.1.0</span></span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">metadataVersion</span><span class="kw">:</span><span class="at"> 4.1-IV0</span></span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">listeners</span><span class="kw">:</span></span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> tls</span></span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">port</span><span class="kw">:</span><span class="at"> </span><span class="dv">9093</span></span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">type</span><span class="kw">:</span><span class="at"> internal</span></span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">tls</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">authentication</span><span class="kw">:</span></span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">type</span><span class="kw">:</span><span class="at"> tls</span></span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">config</span><span class="kw">:</span></span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">ssl.enabled.protocols</span><span class="kw">:</span><span class="at"> </span><span class="st">"TLSv1.3"</span></span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">ssl.protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"TLSv1.3"</span></span>
+<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">ssl.cipher.suites</span><span class="kw">:</span><span class="at"> </span><span class="st">"TLS_AES_256_GCM_SHA384"</span><span class="at">          </span></span>
+<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">entityOperator</span><span class="kw">:</span></span>
+<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">topicOperator</span><span class="kw">:</span><span class="at"> </span><span class="kw">{}</span></span>
+<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">userOperator</span><span class="kw">:</span><span class="at"> </span><span class="kw">{}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Apply the manifest:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> apply <span class="at">-f</span> kafka-lab.yaml</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>3. Create a User for mTLS Authentication</strong> Since mTLS is enabled, the client must present a certificate signed by the Cluster CA. Strimzi’s <code>KafkaUser</code> resource automates this by creating a Kubernetes secret containing the user’s private key and signed certificate.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> kafka.strimzi.io/v1</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> KafkaUser</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> lab-user</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">namespace</span><span class="kw">:</span><span class="at"> kafka-lab</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">labels</span><span class="kw">:</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">strimzi.io/cluster</span><span class="kw">:</span><span class="at"> lab-broker</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">authentication</span><span class="kw">:</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> tls</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Apply the user manifest:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> apply <span class="at">-f</span> kafka-user.yaml</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>4. Create a Topic and Test Connection</strong> Because we are using internal networking, the broker address is <code>lab-broker-kafka-bootstrap.kafka-lab.svc.cluster.local:9093</code>. To create a topic, we will use the operator’s <code>KafkaTopic</code> resource.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> kafka.strimzi.io/v1</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> KafkaTopic</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> test-topic</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">namespace</span><span class="kw">:</span><span class="at"> kafka-lab</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">labels</span><span class="kw">:</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">strimzi.io/cluster</span><span class="kw">:</span><span class="at"> lab-broker</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">partitions</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">replicas</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Apply the topic manifest:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> apply <span class="at">-f</span> kafka-topic.yaml</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>5. Extract Credentials for EEM Gateway</strong> When you configure your EEM Gateway to point to this backend, you will need the User certificate/key (to authenticate).</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Get the User Cert and Key (to be added to Gateway Keystore)</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> get secret lab-user <span class="at">-n</span> kafka-lab <span class="at">-o</span> jsonpath=<span class="st">'{.data.user\.crt}'</span> <span class="kw">|</span> <span class="fu">base64</span> <span class="at">-d</span> <span class="op">&gt;</span> user.crt</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> get secret lab-user <span class="at">-n</span> kafka-lab <span class="at">-o</span> jsonpath=<span class="st">'{.data.user\.key}'</span> <span class="kw">|</span> <span class="fu">base64</span> <span class="at">-d</span> <span class="op">&gt;</span> user.key</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
 </div>
 </div>
 </section>
@@ -370,7 +466,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h3 class="anchored" data-anchor-id="connect-the-backend-kafka-cluster">3.2 Connect the Backend Kafka Cluster</h3>
 <p>Once the Gateway is connected, you must tell it where to route the Kafka traffic.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" role="tab" aria-controls="tabset-2-1" aria-selected="true" href="">Option A: Production (Enterprise Kafka)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" role="tab" aria-controls="tabset-2-2" aria-selected="false" href="">Option B: Lab (Bitnami Test Broker)</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" role="tab" aria-controls="tabset-2-1" aria-selected="true" href="">Option A: Production (Enterprise Kafka)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" role="tab" aria-controls="tabset-2-2" aria-selected="false" href="">Option B: Lab (Bitnami)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-2-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-3" role="tab" aria-controls="tabset-2-3" aria-selected="false" href="">Option C: Lab (Strimzi)</a></li></ul>
 <div class="tab-content">
 <div id="tabset-2-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-2-1-tab">
 <p><strong>Use Case:</strong> Connecting to AWS MSK, Confluent, or Event Streams.</p>
@@ -378,12 +474,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>Navigate to the <strong>Clusters</strong> page in the EEM UI.<br>
 </li>
 <li>Click <strong>Add cluster</strong>.</li>
-<li>Enter a name (e.g., <code>test-kafka-cluster</code>).<br>
+<li>Enter a name (e.g., <code>prod-kafka-cluster</code>).<br>
 </li>
 <li>Enter the DNS name and port for the bootstrap server: <code>kafka.corp:443</code>.<br>
 </li>
-<li>If certificates are set up for the Kafka broker, an error will display saying “Multiple certificates are not trusted”. Click “Accept all certificates”. Click Next.</li>
-<li>On the Credentials screen, enter any client authentication needed. Click create to finish adding the cluster.</li>
+<li>If certificates are set up for the Kafka broker, an error will display saying “Multiple certificates are not trusted”. Click <strong>Accept all certificates</strong> and then click <strong>Next</strong>.</li>
+<li>If your enterprise broker requires Mutual TLS (mTLS), you will be prompted on the next screen to configure your client authentication. Upload your client certificate and private key, then click <strong>Next</strong>.</li>
+<li>On the <strong>Credentials</strong> screen, if your broker uses SASL, enter those credentials here. If authentication was completely handled by your mTLS client certificates, select <strong>No credentials required</strong>.</li>
+<li>Click <strong>Create</strong> to finish adding the cluster.</li>
 </ol>
 </div>
 <div id="tabset-2-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-2-2-tab">
@@ -393,12 +491,31 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
 <li>Click <strong>Add cluster</strong>.<br>
 </li>
-<li>Enter a name (e.g., <code>test-kafka-cluster</code>).<br>
+<li>Enter a name (e.g., <code>bitnami-lab-cluster</code>).<br>
 </li>
 <li>Enter the internal Kubernetes DNS name for the bootstrap server: <code>test-kafka.kafka-lab.svc.cluster.local:9092</code>.<br>
 </li>
-<li>If certificates are set up for the Kafka cluster, you will be prompted to accept the certificates. Click Next.</li>
-<li>On the Credentials screen, since we configured the broker for one-way SSL without client authentication. Click create to finish adding the cluster.</li>
+<li>Because the broker is configured for one-way SSL, you will be prompted to accept the server certificates. Review and accept them, then click <strong>Next</strong>.</li>
+<li>Since this specific lab broker does not require client certificates, bypass the client certificate upload and click <strong>Next</strong>.</li>
+<li>On the <strong>Credentials</strong> screen, since we configured the broker without client authentication, select <strong>No credentials required</strong>.</li>
+<li>Click <strong>Create</strong> to finish adding the cluster.</li>
+</ol>
+</div>
+<div id="tabset-2-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-2-3-tab">
+<p><strong>Use Case:</strong> Connecting to the Mutual TLS (mTLS) secured Strimzi broker we spun up in the <code>kafka-lab</code> namespace on EKS.</p>
+<ol type="1">
+<li>Navigate to the <strong>Clusters</strong> page in the EEM Manager UI.<br>
+</li>
+<li>Click <strong>Add cluster</strong>.<br>
+</li>
+<li>Enter a name (e.g., <code>strimzi-lab-cluster</code>).<br>
+</li>
+<li>Enter the internal Kubernetes DNS name for the Strimzi TLS bootstrap server: <code>lab-broker-kafka-bootstrap.kafka-lab.svc.cluster.local:9093</code>.<br>
+</li>
+<li>EEM will detect the secure connection and prompt you to accept the server certificates provided by the Strimzi Cluster CA. Review and accept them, then click <strong>Next</strong>.</li>
+<li>On the following certificate screen, because the broker enforces mTLS, you will be prompted to provide your client certificates. Upload or paste the contents of the <code>user.crt</code> (Certificate) and <code>user.key</code> (Private Key) files you extracted earlier for the <code>lab-user</code>, then click <strong>Next</strong>.</li>
+<li>On the <strong>Credentials</strong> screen, select <strong>No credentials required</strong>, as authentication is fully handled by the client certificates you just provided.</li>
+<li>Click <strong>Create</strong> to finish adding the cluster and establish the secure connection.</li>
 </ol>
 </div>
 </div>
@@ -475,59 +592,59 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="tab-content">
 <div id="tabset-3-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-3-1-tab">
 <p><strong>Use Case:</strong> Matching the production spec on AWS EKS. We will allocate capacity for 3 brokers and define the endpoint with the ALB annotations to satisfy the webhook (though actual traffic will use our manual NLB).</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ... (inside gateway-deployment.yaml) ...</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">license</span><span class="kw">:</span></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co">    # 1. Accept the license</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">accept</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">license</span><span class="kw">:</span><span class="at"> </span><span class="st">"L-CYBH-K48BZQ"</span></span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">metric</span><span class="kw">:</span><span class="at"> </span><span class="st">"VIRTUAL_PROCESSOR_CORE"</span></span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">use</span><span class="kw">:</span><span class="at"> </span><span class="st">"EventAutomationProduction"</span></span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">managerEndpoint</span><span class="kw">:</span><span class="at"> </span><span class="st">"https://eem.server.eem.corp/gateway"</span></span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">gatewayGroupName</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group"</span></span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">gatewayID</span><span class="kw">:</span><span class="at"> </span><span class="st">"eem-gateway-prod"</span></span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">replicas</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="co">  # 2. Reduce broker capacity</span></span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">maxNumKafkaBrokers</span><span class="kw">:</span><span class="at"> </span><span class="dv">3</span></span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="co">  # 3. Define the endpoint routing</span></span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">endpoints</span><span class="kw">:</span></span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> gateway</span></span>
-<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">host</span><span class="kw">:</span><span class="at"> kafka-gateway.eem.corp</span></span>
-<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">annotations</span><span class="kw">:</span></span>
-<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"alb"</span></span>
-<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">alb.ingress.kubernetes.io/scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
-<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">alb.ingress.kubernetes.io/target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
-<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a><span class="co">  # ... rest of file remains unchanged ...</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ... (inside gateway-deployment.yaml) ...</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">license</span><span class="kw">:</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="co">    # 1. Accept the license</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">accept</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">license</span><span class="kw">:</span><span class="at"> </span><span class="st">"L-CYBH-K48BZQ"</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">metric</span><span class="kw">:</span><span class="at"> </span><span class="st">"VIRTUAL_PROCESSOR_CORE"</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">use</span><span class="kw">:</span><span class="at"> </span><span class="st">"EventAutomationProduction"</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">managerEndpoint</span><span class="kw">:</span><span class="at"> </span><span class="st">"https://eem.server.eem.corp/gateway"</span></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">gatewayGroupName</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group"</span></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">gatewayID</span><span class="kw">:</span><span class="at"> </span><span class="st">"eem-gateway-prod"</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">replicas</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a><span class="co">  # 2. Reduce broker capacity</span></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">maxNumKafkaBrokers</span><span class="kw">:</span><span class="at"> </span><span class="dv">3</span></span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a><span class="co">  # 3. Define the endpoint routing</span></span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">endpoints</span><span class="kw">:</span></span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> gateway</span></span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">host</span><span class="kw">:</span><span class="at"> kafka-gateway.eem.corp</span></span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"alb"</span></span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">alb.ingress.kubernetes.io/scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
+<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">alb.ingress.kubernetes.io/target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
+<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a><span class="co">  # ... rest of file remains unchanged ...</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div id="tabset-3-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-3-2-tab">
 <p><strong>Use Case:</strong> Saving maximum resources in the k3s lab while testing the Bitnami broker. We only need 1 broker endpoint and will route it using the NGINX controller with SSL passthrough enabled.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ... (inside gateway-deployment.yaml) ...</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">license</span><span class="kw">:</span></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co">    # 1. Accept the license</span></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">accept</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">license</span><span class="kw">:</span><span class="at"> </span><span class="st">"L-CYBH-K48BZQ"</span></span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">metric</span><span class="kw">:</span><span class="at"> </span><span class="st">"VIRTUAL_PROCESSOR_CORE"</span></span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">use</span><span class="kw">:</span><span class="at"> </span><span class="st">"EventAutomationProduction"</span></span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">managerEndpoint</span><span class="kw">:</span><span class="at"> </span><span class="st">"https://eem.eem-server.gym.lan/gateway"</span></span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">gatewayGroupName</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group"</span></span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">gatewayID</span><span class="kw">:</span><span class="at"> </span><span class="st">"eem-gateway-lab"</span></span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">replicas</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="co">  # 2. Reduce broker capacity</span></span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">maxNumKafkaBrokers</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="co">  # 3. Define the endpoint routing</span></span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">endpoints</span><span class="kw">:</span></span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> gateway</span></span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">host</span><span class="kw">:</span><span class="at"> kafka-gateway.gym.lan</span></span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">annotations</span><span class="kw">:</span></span>
-<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"nginx"</span></span>
-<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">nginx.ingress.kubernetes.io/ssl-passthrough</span><span class="kw">:</span><span class="at"> </span><span class="st">"true"</span></span>
-<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a><span class="co">  # ... rest of file remains unchanged ...</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ... (inside gateway-deployment.yaml) ...</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">license</span><span class="kw">:</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="co">    # 1. Accept the license</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">accept</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">license</span><span class="kw">:</span><span class="at"> </span><span class="st">"L-CYBH-K48BZQ"</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">metric</span><span class="kw">:</span><span class="at"> </span><span class="st">"VIRTUAL_PROCESSOR_CORE"</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">use</span><span class="kw">:</span><span class="at"> </span><span class="st">"EventAutomationProduction"</span></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">managerEndpoint</span><span class="kw">:</span><span class="at"> </span><span class="st">"https://eem.eem-server.gym.lan/gateway"</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">gatewayGroupName</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group"</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">gatewayID</span><span class="kw">:</span><span class="at"> </span><span class="st">"eem-gateway-lab"</span></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">replicas</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a><span class="co">  # 2. Reduce broker capacity</span></span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">maxNumKafkaBrokers</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a><span class="co">  # 3. Define the endpoint routing</span></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">endpoints</span><span class="kw">:</span></span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> gateway</span></span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">host</span><span class="kw">:</span><span class="at"> kafka-gateway.gym.lan</span></span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"nginx"</span></span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">nginx.ingress.kubernetes.io/ssl-passthrough</span><span class="kw">:</span><span class="at"> </span><span class="st">"true"</span></span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a><span class="co">  # ... rest of file remains unchanged ...</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </div>
 </div>
 <p><strong>3. Apply the Gateway CR:</strong> Once your modifications are saved, apply the YAML directly to the cluster to establish the connection:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> apply <span class="at">-f</span> gateway-deployment.yaml <span class="at">-n</span> ibm-eem</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> apply <span class="at">-f</span> gateway-deployment.yaml <span class="at">-n</span> ibm-eem</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="callout callout-style-default callout-tip callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -552,32 +669,32 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p><strong>Use Case:</strong> The IBM Operator generated an ALB to satisfy cluster admission webhooks, but we need an actual Network Load Balancer (NLB) to handle the TCP mTLS traffic.</p>
 <p>Create a manual <code>Service</code> to provision an AWS NLB that targets the running Gateway pods directly.</p>
 <p>Create a file named <code>eem-gateway-nlb.yaml</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> v1</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> Service</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> eem-gateway-nlb</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">namespace</span><span class="kw">:</span><span class="at"> ibm-eem</span></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">annotations</span><span class="kw">:</span></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"external"</span></span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-nlb-target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"TCP"</span></span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled</span><span class="kw">:</span><span class="at"> </span><span class="st">"true"</span></span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="co">    # Anonymized enterprise tags</span></span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags</span><span class="kw">:</span><span class="at"> </span><span class="st">"Name=eem-gateway-nlb,tfc-application-group=event-streaming,tfc-technical-environment=lab"</span></span>
-<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">type</span><span class="kw">:</span><span class="at"> LoadBalancer</span></span>
-<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">ports</span><span class="kw">:</span></span>
-<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> gateway-tls</span></span>
-<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">port</span><span class="kw">:</span><span class="at"> </span><span class="dv">443</span></span>
-<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">targetPort</span><span class="kw">:</span><span class="at"> </span><span class="dv">8443</span></span>
-<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">protocol</span><span class="kw">:</span><span class="at"> TCP</span></span>
-<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">selector</span><span class="kw">:</span></span>
-<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a><span class="co">    # These labels target the Gateway pods provisioned by your EEM Custom Resource</span></span>
-<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">app.kubernetes.io/instance</span><span class="kw">:</span><span class="at"> eem-manager</span></span>
-<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">app.kubernetes.io/name</span><span class="kw">:</span><span class="at"> gateway</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> v1</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> Service</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> eem-gateway-nlb</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">namespace</span><span class="kw">:</span><span class="at"> ibm-eem</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"external"</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-nlb-target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"TCP"</span></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled</span><span class="kw">:</span><span class="at"> </span><span class="st">"true"</span></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a><span class="co">    # Anonymized enterprise tags</span></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags</span><span class="kw">:</span><span class="at"> </span><span class="st">"Name=eem-gateway-nlb,tfc-application-group=event-streaming,tfc-technical-environment=lab"</span></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">type</span><span class="kw">:</span><span class="at"> LoadBalancer</span></span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">ports</span><span class="kw">:</span></span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> gateway-tls</span></span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">port</span><span class="kw">:</span><span class="at"> </span><span class="dv">443</span></span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">targetPort</span><span class="kw">:</span><span class="at"> </span><span class="dv">8443</span></span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">protocol</span><span class="kw">:</span><span class="at"> TCP</span></span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">selector</span><span class="kw">:</span></span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a><span class="co">    # These labels target the Gateway pods provisioned by your EEM Custom Resource</span></span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">app.kubernetes.io/instance</span><span class="kw">:</span><span class="at"> eem-manager</span></span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">app.kubernetes.io/name</span><span class="kw">:</span><span class="at"> gateway</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><strong>Apply the NLB Service:</strong></p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> apply <span class="at">-f</span> eem-gateway-nlb.yaml</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> apply <span class="at">-f</span> eem-gateway-nlb.yaml</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><em>Update your DNS records so that <code>gateway.eem.corp</code> points to the new NLB hostname rather than the placeholder ALB.</em></p>
 </div>
 <div id="tabset-4-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-4-2-tab">

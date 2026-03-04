@@ -528,7 +528,42 @@ To monitor the actual readiness status of the deployment, watch the Custom Resou
 `kubectl get eventendpointmanagement eem-manager -n ibm-eem -w`
 :::
 
-### 2.6 Configure User Roles
+### 2.6 Configure Local DNS Resolution
+
+Because we are using the generic `.local.test` domain for this pilot, public DNS servers will not know how to route your browser to the EKS cluster. You must manually map the EEM Manager hostnames to the Application Load Balancer (ALB) IP addresses on your local workstation.
+
+**1. Retrieve the ALB Hostname**
+Get the external address of your EEM Manager ingress resource:
+
+```bash
+kubectl get ingress -n ibm-eem
+```
+*Locate the `ADDRESS` column, which will contain a long AWS hostname (e.g., `k8s-ibmeem-default-xxxxx.us-east-1.elb.amazonaws.com`).*
+
+**2. Resolve the ALB IP Addresses**
+The local hosts file requires IPv4 addresses, not AWS hostnames. Use your terminal to resolve the ALB hostname into its underlying IP addresses:
+
+```bash
+nslookup <your-alb-hostname>
+```
+*AWS ALBs typically return two or more IP addresses. You only need to copy one of them for the next step.*
+
+**3. Update your Workstation Hosts File**
+
+Open your local hosts file as an Administrator or root user:
+
+* **Windows:** `C:\Windows\System32\drivers\etc\hosts`
+* **Mac/Linux:** `/etc/hosts`
+
+Add a new line at the bottom mapping the resolved IP address to your EEM Manager subdomains:
+
+```text
+# IBM EEM EKS Pilot
+34.234.x.x  eem-ui.local.test eem.eem-server.local.test
+```
+*Save the file. Your workstation browser will now securely route traffic directly to the AWS ALB.*
+
+### 2.7 Configure User Roles
 
 When deploying your EEM instance, you must grant initial access to the system. The configuration depends entirely on your chosen authentication method.
 

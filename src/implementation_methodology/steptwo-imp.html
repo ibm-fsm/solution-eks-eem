@@ -261,7 +261,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#create-oidc-security-assets" id="toc-create-oidc-security-assets" class="nav-link" data-scroll-target="#create-oidc-security-assets">2.3 Create OIDC Security Assets</a></li>
   <li><a href="#create-and-import-the-tls-certificate" id="toc-create-and-import-the-tls-certificate" class="nav-link" data-scroll-target="#create-and-import-the-tls-certificate">2.4 Create and Import the TLS Certificate</a></li>
   <li><a href="#deploy-the-eem-instance" id="toc-deploy-the-eem-instance" class="nav-link" data-scroll-target="#deploy-the-eem-instance">2.5 Deploy the EEM Instance</a></li>
-  <li><a href="#configure-user-roles" id="toc-configure-user-roles" class="nav-link" data-scroll-target="#configure-user-roles">2.6 Configure User Roles</a></li>
+  <li><a href="#configure-local-dns-resolution" id="toc-configure-local-dns-resolution" class="nav-link" data-scroll-target="#configure-local-dns-resolution">2.6 Configure Local DNS Resolution</a></li>
+  <li><a href="#configure-user-roles" id="toc-configure-user-roles" class="nav-link" data-scroll-target="#configure-user-roles">2.7 Configure User Roles</a></li>
   </ul>
 </nav>
     </div>
@@ -760,8 +761,28 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </div>
 </section>
+<section id="configure-local-dns-resolution" class="level3">
+<h3 class="anchored" data-anchor-id="configure-local-dns-resolution">2.6 Configure Local DNS Resolution</h3>
+<p>Because we are using the generic <code>.local.test</code> domain for this pilot, public DNS servers will not know how to route your browser to the EKS cluster. You must manually map the EEM Manager hostnames to the Application Load Balancer (ALB) IP addresses on your local workstation.</p>
+<p><strong>1. Retrieve the ALB Hostname</strong> Get the external address of your EEM Manager ingress resource:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> get ingress <span class="at">-n</span> ibm-eem</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Locate the <code>ADDRESS</code> column, which will contain a long AWS hostname (e.g., <code>k8s-ibmeem-default-xxxxx.us-east-1.elb.amazonaws.com</code>).</em></p>
+<p><strong>2. Resolve the ALB IP Addresses</strong> The local hosts file requires IPv4 addresses, not AWS hostnames. Use your terminal to resolve the ALB hostname into its underlying IP addresses:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="ex">nslookup</span> <span class="op">&lt;</span>your-alb-hostname<span class="op">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>AWS ALBs typically return two or more IP addresses. You only need to copy one of them for the next step.</em></p>
+<p><strong>3. Update your Workstation Hosts File</strong></p>
+<p>Open your local hosts file as an Administrator or root user:</p>
+<ul>
+<li><strong>Windows:</strong> <code>C:\Windows\System32\drivers\etc\hosts</code></li>
+<li><strong>Mac/Linux:</strong> <code>/etc/hosts</code></li>
+</ul>
+<p>Add a new line at the bottom mapping the resolved IP address to your EEM Manager subdomains:</p>
+<pre class="text"><code># IBM EEM EKS Pilot
+34.234.x.x  eem-ui.local.test eem.eem-server.local.test</code></pre>
+<p><em>Save the file. Your workstation browser will now securely route traffic directly to the AWS ALB.</em></p>
+</section>
 <section id="configure-user-roles" class="level3">
-<h3 class="anchored" data-anchor-id="configure-user-roles">2.6 Configure User Roles</h3>
+<h3 class="anchored" data-anchor-id="configure-user-roles">2.7 Configure User Roles</h3>
 <p>When deploying your EEM instance, you must grant initial access to the system. The configuration depends entirely on your chosen authentication method.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-4-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-1" role="tab" aria-controls="tabset-4-1" aria-selected="true" href="">Option A: OIDC Auth (UUID Mapping)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-4-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-2" role="tab" aria-controls="tabset-4-2" aria-selected="false" href="">Option B: Local Auth (Credentials &amp; Mapping)</a></li></ul>
@@ -770,57 +791,57 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p><strong>Use Case:</strong> External Identity Provider (Keycloak, Auth0, etc.)</p>
 <p>By default, an OIDC user has no permissions upon first login. You must map the Identity Provider’s user subject (UUID) directly to the EEM roles.</p>
 <p><strong>1. Create the Mapping File:</strong> Create a file named <code>myroles.json</code> and replace the <code>id</code> below with your Keycloak User UUID.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
-<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"mappings"</span><span class="fu">:</span> <span class="ot">[</span></span>
-<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
-<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"id"</span><span class="fu">:</span> <span class="st">"130ea2d9-e60c-4f28-8499-386ecda2d825"</span><span class="fu">,</span></span>
-<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"roles"</span><span class="fu">:</span> <span class="ot">[</span></span>
-<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"admin"</span><span class="ot">,</span></span>
-<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"author"</span></span>
-<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>      <span class="ot">]</span></span>
-<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
-<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span></span>
-<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb23"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"mappings"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"id"</span><span class="fu">:</span> <span class="st">"130ea2d9-e60c-4f28-8499-386ecda2d825"</span><span class="fu">,</span></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"roles"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"admin"</span><span class="ot">,</span></span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"author"</span></span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>      <span class="ot">]</span></span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span></span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><strong>2. Patch the Roles Secret:</strong> Inject this JSON directly into the user-roles secret managed by the operator.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> patch secret eem-manager-ibm-eem-user-roles <span class="dt">\</span></span>
-<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
-<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--type</span><span class="op">=</span><span class="st">'json'</span> <span class="dt">\</span></span>
-<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">-p</span><span class="op">=</span><span class="st">"[{</span><span class="dt">\"</span><span class="st">op</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">replace</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">path</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">/data/user-mapping.json</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">value</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="va">$(</span><span class="fu">cat</span> myroles.json <span class="kw">|</span> <span class="fu">base64</span> <span class="at">-w</span> 0<span class="va">)</span><span class="dt">\"</span><span class="st">}]"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb24"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> patch secret eem-manager-ibm-eem-user-roles <span class="dt">\</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--type</span><span class="op">=</span><span class="st">'json'</span> <span class="dt">\</span></span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">-p</span><span class="op">=</span><span class="st">"[{</span><span class="dt">\"</span><span class="st">op</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">replace</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">path</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">/data/user-mapping.json</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">value</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="va">$(</span><span class="fu">cat</span> myroles.json <span class="kw">|</span> <span class="fu">base64</span> <span class="at">-w</span> 0<span class="va">)</span><span class="dt">\"</span><span class="st">}]"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div id="tabset-4-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-4-2-tab">
 <p><strong>Use Case:</strong> Built-in Local Directory</p>
 <p>For local authentication, you must first define the user credentials, and then map that new user ID to the appropriate roles.</p>
 <p><strong>1. Create the Credentials File:</strong> Create a file named <code>myusers.json</code> with your desired administrator credentials.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb22"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
-<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"users"</span><span class="fu">:</span> <span class="ot">[</span></span>
-<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>        <span class="fu">{</span></span>
-<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>            <span class="dt">"username"</span><span class="fu">:</span> <span class="st">"eemadmin"</span><span class="fu">,</span></span>
-<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>            <span class="dt">"password"</span><span class="fu">:</span> <span class="st">"Password1$"</span></span>
-<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>        <span class="fu">}</span></span>
-<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>    <span class="ot">]</span></span>
-<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb25"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"users"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>        <span class="fu">{</span></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>            <span class="dt">"username"</span><span class="fu">:</span> <span class="st">"eemadmin"</span><span class="fu">,</span></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>            <span class="dt">"password"</span><span class="fu">:</span> <span class="st">"Password1$"</span></span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>        <span class="fu">}</span></span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>    <span class="ot">]</span></span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><strong>2. Patch the Credentials Secret:</strong> Inject the user definition into the credentials secret.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb23"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> patch secret eem-manager-ibm-eem-user-credentials <span class="dt">\</span></span>
-<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
-<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--type</span><span class="op">=</span><span class="st">'json'</span> <span class="dt">\</span></span>
-<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">-p</span><span class="op">=</span><span class="st">"[{</span><span class="dt">\"</span><span class="st">op</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">replace</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">path</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">/data/user-credentials.json</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">value</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="va">$(</span><span class="fu">cat</span> myusers.json <span class="kw">|</span> <span class="fu">base64</span> <span class="at">-w</span> 0<span class="va">)</span><span class="dt">\"</span><span class="st">}]"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb26"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> patch secret eem-manager-ibm-eem-user-credentials <span class="dt">\</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--type</span><span class="op">=</span><span class="st">'json'</span> <span class="dt">\</span></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">-p</span><span class="op">=</span><span class="st">"[{</span><span class="dt">\"</span><span class="st">op</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">replace</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">path</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">/data/user-credentials.json</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">value</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="va">$(</span><span class="fu">cat</span> myusers.json <span class="kw">|</span> <span class="fu">base64</span> <span class="at">-w</span> 0<span class="va">)</span><span class="dt">\"</span><span class="st">}]"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><strong>3. Create the Mapping File:</strong> Create a file named <code>myroles.json</code> mapping your new <code>username</code> to the administrative roles.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb24"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
-<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"mappings"</span><span class="fu">:</span> <span class="ot">[</span></span>
-<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
-<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"id"</span><span class="fu">:</span> <span class="st">"eemadmin"</span><span class="fu">,</span></span>
-<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"roles"</span><span class="fu">:</span> <span class="ot">[</span></span>
-<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"admin"</span><span class="ot">,</span></span>
-<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"author"</span></span>
-<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>      <span class="ot">]</span></span>
-<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
-<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span></span>
-<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb27"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"mappings"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"id"</span><span class="fu">:</span> <span class="st">"eemadmin"</span><span class="fu">,</span></span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"roles"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"admin"</span><span class="ot">,</span></span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"author"</span></span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>      <span class="ot">]</span></span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span></span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><strong>4. Patch the Roles Secret:</strong> Inject the mapping JSON into the user-roles secret.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb25"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> patch secret eem-manager-ibm-eem-user-roles <span class="dt">\</span></span>
-<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
-<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--type</span><span class="op">=</span><span class="st">'json'</span> <span class="dt">\</span></span>
-<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">-p</span><span class="op">=</span><span class="st">"[{</span><span class="dt">\"</span><span class="st">op</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">replace</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">path</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">/data/user-mapping.json</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">value</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="va">$(</span><span class="fu">cat</span> myroles.json <span class="kw">|</span> <span class="fu">base64</span> <span class="at">-w</span> 0<span class="va">)</span><span class="dt">\"</span><span class="st">}]"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb28"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> patch secret eem-manager-ibm-eem-user-roles <span class="dt">\</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--namespace</span> ibm-eem <span class="dt">\</span></span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--type</span><span class="op">=</span><span class="st">'json'</span> <span class="dt">\</span></span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">-p</span><span class="op">=</span><span class="st">"[{</span><span class="dt">\"</span><span class="st">op</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">replace</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">path</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="st">/data/user-mapping.json</span><span class="dt">\"</span><span class="st"> ,</span><span class="dt">\"</span><span class="st">value</span><span class="dt">\"</span><span class="st"> : </span><span class="dt">\"</span><span class="va">$(</span><span class="fu">cat</span> myroles.json <span class="kw">|</span> <span class="fu">base64</span> <span class="at">-w</span> 0<span class="va">)</span><span class="dt">\"</span><span class="st">}]"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </div>
 </div>

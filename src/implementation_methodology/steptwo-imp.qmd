@@ -136,7 +136,7 @@ kubectl get deploy ibm-eem-operator -n ibm-eem
 ```
 :::
 
-### 2.3 Create Security Assets
+### 2.3 Create OIDC Security Assets
 
 EEM requires several Kubernetes secrets to be pre-provisioned for OIDC authentication and TLS trust.
 
@@ -168,14 +168,54 @@ kubectl create secret generic keycloak-trust-secret \
   --from-file=ca.crt=keycloak.pem
 ```
 
-### 2.4 Deploy the EEM Instance
+### 2.4 Create and Import the TLS Certificate
+
+For this EKS pilot environment, we will generate a self-signed TLS certificate to secure the EEM Manager endpoints exposed via the AWS Application Load Balancer (ALB).
+
+**Important:** In a production environment, you should always request and use real, CA-signed certificates for your endpoints. However, for this lab demonstration, we will generate a self-signed certificate that includes the necessary Subject Alternative Names (SANs) to ensure all internal API communication and UI routing function correctly.
+
+#### 1. Generate a SAN-Enabled Certificate
+Use `openssl` to generate a self-signed certificate and private key. The `-addext` flag explicitly injects the multi-level subdomains required for the internal Gateway-to-Manager routing.
+
+```bash
+# Generate a new private key and SAN-enabled certificate
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout local-test.key -out local-test.crt \
+  -subj "/O=LabEnvironment/CN=*.local.test" \
+  -addext "subjectAltName=DNS:*.local.test,DNS:eem-ui.local.test,DNS:eem.eem-server.local.test,DNS:eem-gateway.local.test,DNS:eem-admin.local.test"
+```
+
+#### 2. Import the Certificate into AWS ACM
+The AWS Load Balancer Controller requires the certificate to reside in AWS Certificate Manager (ACM). Use the AWS CLI to import the files. 
+
+*Note: You must use the `fileb://` prefix so the CLI reads the raw binary bytes of the PEM file, preventing formatting corruption.*
+
+```bash
+aws acm import-certificate \
+  --certificate fileb://local-test.crt \
+  --private-key fileb://local-test.key \
+  --region us-east-1
+```
+
+#### 3. Retrieve the Certificate ARN
+Upon successful import, the AWS CLI will output the Amazon Resource Name (ARN) of your new certificate. It will look similar to this:
+
+```json
+{
+    "CertificateArn": "arn:aws:acm:us-east-1:123456789012:certificate/abcd-1234-efgh-5678"
+}
+```
+
+Copy this `CertificateArn` value. You will need to paste it into the ALB ingress annotations in the upcoming EEM Custom Resource deployment step.
+
+### 2.5 Deploy the EEM Instance
 
 We use a Custom Resource (CR) to define the EEM instance. Select the configuration that matches your environment.
 
 :::{.panel-tabset}
 
-## Option A: Production (Generic)
-**Use Case:** Standard deployment with valid CA-signed certificates and OIDC authentication.
+## Option A: AWS EKS (OIDC)
+**Use Case:** Standard deployment with Self-signed certificates for manager endpoints and OIDC authentication.
 
 Create a file named `eem-instance.yaml`:
 
@@ -194,7 +234,8 @@ spec:
   manager:
     endpoints:
       - name: ui
-        host: eem-portal.corp
+        host: eem-ui.local.test
+        class: alb
         annotations:
           # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
           external-dns.alpha.kubernetes.io/ttl: "300"
@@ -206,8 +247,11 @@ spec:
           alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
           alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
           alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
+          # Replace this ARN with the value from your ACM import step
+          alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:123456789012:certificate/abcd-1234-efgh-5678
       - name: gateway
-        host: eem-gateway.corp
+        host: eem-gateway.local.test
+        class: alb
         annotations:
           # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
           external-dns.alpha.kubernetes.io/ttl: "300"
@@ -219,8 +263,11 @@ spec:
           alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
           alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
           alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
+          # Replace this ARN with the value from your ACM import step
+          alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:123456789012:certificate/abcd-1234-efgh-5678
       - name: admin
-        host: eem-admin.corp
+        host: eem-admin.local.test
+        class: alb
         annotations:
           # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
           external-dns.alpha.kubernetes.io/ttl: "300"
@@ -232,8 +279,11 @@ spec:
           alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
           alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
           alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
+          # Replace this ARN with the value from your ACM import step
+          alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:123456789012:certificate/abcd-1234-efgh-5678
       - name: server
-        host: eem.server.corp
+        host: eem.eem-server.local.test
+        class: alb
         annotations:
           # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
           external-dns.alpha.kubernetes.io/ttl: "300"
@@ -245,6 +295,8 @@ spec:
           alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
           alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
           alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
+          # Replace this ARN with the value from your ACM import step
+          alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:123456789012:certificate/abcd-1234-efgh-5678
     authConfig:
       authType: OIDC
       oidcConfig:
@@ -290,59 +342,68 @@ spec:
     endpoints:
       - name: ui
         host: eem-portal.gym.lan
+        class: alb
         annotations:
           # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
           external-dns.alpha.kubernetes.io/ttl: "300"
-          kubernetes.io/ingress.class: "nginx"
-          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          kubernetes.io/ingress.class: "alb"
           alb.ingress.kubernetes.io/scheme: "internal"
           alb.ingress.kubernetes.io/target-type: "ip"
           alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
           alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+          alb.ingress.kubernetes.io/group.name: eem-manager
           alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
           alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
           alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
       - name: gateway
         host: eem-gateway.gym.lan
+        class: alb
         annotations:
           # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
           external-dns.alpha.kubernetes.io/ttl: "300"
-          kubernetes.io/ingress.class: "nginx"
-          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          kubernetes.io/ingress.class: "alb"
+          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
           alb.ingress.kubernetes.io/scheme: "internal"
           alb.ingress.kubernetes.io/target-type: "ip"
           alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
           alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+          alb.ingress.kubernetes.io/group.name: eem-manager
           alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
           alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
           alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
       - name: admin
         host: eem-admin.gym.lan
+        class: alb
         annotations:
           # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
           external-dns.alpha.kubernetes.io/ttl: "300"
-          kubernetes.io/ingress.class: "nginx"
-          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          kubernetes.io/ingress.class: "alb"
+          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
           alb.ingress.kubernetes.io/scheme: "internal"
           alb.ingress.kubernetes.io/target-type: "ip"
           alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
           alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+          alb.ingress.kubernetes.io/group.name: eem-manager
           alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
           alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
           alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
       - name: server
         host: eem.server.gym.lan
+        class: alb
         annotations:
           # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
           external-dns.alpha.kubernetes.io/ttl: "300"
-          kubernetes.io/ingress.class: "nginx"
-          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-          # in the lab, this allows the gateway to directly route to the backend without terminating TLS, which simplifies the trust configuration with self-signed certs. In production, you would typically terminate at the ALB and not use passthrough.
-          nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+          kubernetes.io/ingress.class: "alb"
+          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
           alb.ingress.kubernetes.io/scheme: "internal"
           alb.ingress.kubernetes.io/target-type: "ip"
           alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
           alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+          alb.ingress.kubernetes.io/group.name: eem-manager
           alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
           alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
           alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
@@ -371,7 +432,7 @@ kubectl apply -f eem-instance.yaml
 ```
 
 ## Option C: AWS EKS (Local Auth)
-**Use Case:** EKS deployment using local credentials (no OIDC) and gp2 block storage.
+**Use Case:** EKS deployment using self-signed certificates for manager endpoints and local credentials (no OIDC).
 
 Create a file named `eem-instance.yaml`:
 
@@ -390,57 +451,57 @@ spec:
   manager:
     endpoints:
       - name: ui
-        host: eem-portal.corp
+        host: eem-ui.local.test
+        class: alb
         annotations:
           # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
-          external-dns.alpha.kubernetes.io/ttl: "300"
-          kubernetes.io/ingress.class: "alb"
-          alb.ingress.kubernetes.io/scheme: "internal"
-          alb.ingress.kubernetes.io/target-type: "ip"
-          alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
-          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
-          alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
-          alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
-          alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
+          kubernetes.io/ingress.class: alb
+          alb.ingress.kubernetes.io/scheme: internet-facing
+          alb.ingress.kubernetes.io/target-type: ip
+          alb.ingress.kubernetes.io/backend-protocol: HTTPS
+          alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+          alb.ingress.kubernetes.io/group.name: eem-manager
+          # Replace this ARN with the value from your ACM import step
+          alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:123456789012:certificate/abcd-1234-efgh-5678
       - name: gateway
-        host: eem-gateway.corp
+        host: eem-gateway.local.test
+        class: alb
         annotations:
           # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
-          external-dns.alpha.kubernetes.io/ttl: "300"
-          kubernetes.io/ingress.class: "alb"
-          alb.ingress.kubernetes.io/scheme: "internal"
-          alb.ingress.kubernetes.io/target-type: "ip"
-          alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
-          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
-          alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
-          alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
-          alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
+          kubernetes.io/ingress.class: alb
+          alb.ingress.kubernetes.io/scheme: internet-facing
+          alb.ingress.kubernetes.io/target-type: ip
+          alb.ingress.kubernetes.io/backend-protocol: HTTPS
+          alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+          alb.ingress.kubernetes.io/group.name: eem-manager
+          # Replace this ARN with the value from your ACM import step
+          alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:123456789012:certificate/abcd-1234-efgh-5678
       - name: admin
-        host: eem-admin.corp
+        host: eem-admin.local.test
+        class: alb
         annotations:
           # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
-          external-dns.alpha.kubernetes.io/ttl: "300"
-          kubernetes.io/ingress.class: "alb"
-          alb.ingress.kubernetes.io/scheme: "internal"
-          alb.ingress.kubernetes.io/target-type: "ip"
-          alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
-          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
-          alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
-          alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
-          alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
+          kubernetes.io/ingress.class: alb
+          alb.ingress.kubernetes.io/scheme: internet-facing
+          alb.ingress.kubernetes.io/target-type: ip
+          alb.ingress.kubernetes.io/backend-protocol: HTTPS
+          alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+          alb.ingress.kubernetes.io/group.name: eem-manager
+          # Replace this ARN with the value from your ACM import step
+          alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:123456789012:certificate/abcd-1234-efgh-5678
       - name: server
-        host: eem.server.corp
+        host: eem.eem-server.local.test
+        class: alb
         annotations:
           # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
-          external-dns.alpha.kubernetes.io/ttl: "300"
-          kubernetes.io/ingress.class: "alb"
-          alb.ingress.kubernetes.io/scheme: "internal"
-          alb.ingress.kubernetes.io/target-type: "ip"
-          alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
-          alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
-          alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
-          alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
-          alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb,tfc-after-hours=middleware-support,tfc-application-group=event-streaming,tfc-business-application-name=event-automation,tfc-business-application-code=app12,tfc-business-application-id=appid-00000000,tfc-business-cost-center=00000-0000,tfc-business-groupname=g-role-devops,tfc-created-by=engineering,tfc-technical-environment=lab,tfc-technical-supported-by=support@example.com"
+          kubernetes.io/ingress.class: alb
+          alb.ingress.kubernetes.io/scheme: internet-facing
+          alb.ingress.kubernetes.io/target-type: ip
+          alb.ingress.kubernetes.io/backend-protocol: HTTPS
+          alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+          alb.ingress.kubernetes.io/group.name: eem-manager
+          # Replace this ARN with the value from your ACM import step
+          alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:123456789012:certificate/abcd-1234-efgh-5678
     authConfig:
       authType: LOCAL
     storage:
@@ -467,7 +528,7 @@ To monitor the actual readiness status of the deployment, watch the Custom Resou
 `kubectl get eventendpointmanagement eem-manager -n ibm-eem -w`
 :::
 
-### 2.5 Configure User Roles
+### 2.6 Configure User Roles
 
 When deploying your EEM instance, you must grant initial access to the system. The configuration depends entirely on your chosen authentication method.
 

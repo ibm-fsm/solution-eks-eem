@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2026-03-04">
+<meta name="dcterms.date" content="2026-03-05">
 
 <title>Phase 3: Gateway Deployment – EEM on EKS</title>
 <style>
@@ -259,7 +259,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#backend-kafka-provisioning" id="toc-backend-kafka-provisioning" class="nav-link active" data-scroll-target="#backend-kafka-provisioning">3.1 Backend Kafka Provisioning</a></li>
   <li><a href="#connect-the-backend-kafka-cluster" id="toc-connect-the-backend-kafka-cluster" class="nav-link" data-scroll-target="#connect-the-backend-kafka-cluster">3.2 Connect the Backend Kafka Cluster</a></li>
   <li><a href="#register-the-gateway-in-the-eem-ui" id="toc-register-the-gateway-in-the-eem-ui" class="nav-link" data-scroll-target="#register-the-gateway-in-the-eem-ui">3.3 Register the Gateway in the EEM UI</a></li>
-  <li><a href="#expose-the-gateway-layer-4-routing" id="toc-expose-the-gateway-layer-4-routing" class="nav-link" data-scroll-target="#expose-the-gateway-layer-4-routing">3.4 Expose the Gateway (Layer 4 Routing)</a></li>
   </ul>
 </nav>
     </div>
@@ -279,7 +278,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">March 4, 2026</p>
+      <p class="date">March 5, 2026</p>
     </div>
   </div>
   
@@ -536,18 +535,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="register-the-gateway-in-the-eem-ui" class="level3">
 <h3 class="anchored" data-anchor-id="register-the-gateway-in-the-eem-ui">3.3 Register the Gateway in the EEM UI</h3>
-<p>Now that the infrastructure is ready, we need to register the Gateway with the Manager. This process generates a Custom Resource (CR) YAML file containing the cryptographic trust and connection details required for the two components to communicate.</p>
-<p><strong>1. Generate the Gateway YAML:</strong></p>
+<p>Now that the infrastructure is ready, we need to register the Gateway with the Manager. By selecting the native Kubernetes deployment option, we bypass the IBM Operator’s ingress restrictions and gain the flexibility to attach an AWS Network Load Balancer (NLB) directly to the gateway pods for raw TCP passthrough.</p>
+<p><strong>1. Generate the Gateway Configuration:</strong></p>
 <ul>
-<li>Log into the EEM Manager UI.<br>
-</li>
-<li>Navigate to the <strong>Gateways</strong> page from the side menu.<br>
-</li>
-<li>Click <strong>Add gateway</strong>.<br>
-</li>
-<li>When prompted for the deployment type, select <strong>Operator-managed deployment</strong>. This ensures the IBM Operator handles the lifecycle, scaling, and certificate rotation for the gateway.<br>
-</li>
-<li>On the <strong>Provide details</strong> screen, configure the following settings:</li>
+<li>Log into the EEM Manager UI.</li>
+<li>In the navigation pane, click <strong>Administration &gt; Event Gateways</strong>.</li>
+<li>Click <strong>Add gateway</strong>.</li>
+<li>Select the <strong>Kubernetes Deployment</strong> tile, then click <strong>Next</strong>.</li>
+<li>Provide the configuration properties for your gateway:</li>
 </ul>
 <table class="caption-top table">
 <colgroup>
@@ -563,88 +558,203 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td style="text-align: left;"><strong>Gateway group</strong></td>
-<td style="text-align: left;">Select <strong>Create a new gateway group</strong> and enter a name (e.g., <code>default-group</code>).</td>
+<td style="text-align: left;">Create or specify an existing gateway group for your new gateway (e.g., <code>default-group</code>).</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;"><strong>Gateway ID</strong></td>
-<td style="text-align: left;">Provide a unique identifier for this gateway (e.g., <code>eem-gateway-lab</code> or <code>eem-gateway-prod</code>).</td>
+<td style="text-align: left;">Provide an ID for your new gateway that is unique within the gateway group (e.g., <code>eem-gateway-lab</code>).</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;"><strong>Replicas</strong></td>
-<td style="text-align: left;">Leave at <code>1</code> for the lab, or scale up as needed for production.</td>
+<td style="text-align: left;">Set to <code>1</code> for the lab environment to create a single Kubernetes replica of the gateway pod.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Server URL</strong></td>
+<td style="text-align: left;">Leave this field blank. We will configure the advertised listener address directly in the Gateway Custom Resource YAML later in the deployment process.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>TLS Certificates</strong></td>
+<td style="text-align: left;">Leave the Gateway private key, Gateway certificate, and CA certificate fields blank. We will map our SAN-enabled certificates explicitly in the YAML in an upcoming step.</td>
 </tr>
 </tbody>
 </table>
 <ul>
-<li>Click <strong>Create</strong> to proceed to the <strong>Deploy Event Gateway</strong> step.</li>
-<li>Click the copy icon on the code block to copy the generated deployment configuration and paste it into a new file named <code>gateway-deployment.yaml</code>.</li>
+<li>Click <strong>Create</strong> to create the deployment YAML.</li>
 </ul>
-<p><strong>2. Modify the Generated Configuration:</strong></p>
-<p>Before applying the file, you must make three important modifications:</p>
+<p><strong>2. Save the Deployment Files:</strong> Following IBM best practices, copy the generated YAML and save it into two separate files so you always have an unaltered backup.</p>
+<ul>
+<li>Save a backup copy as <code>gateway_k8s_original.yaml</code>.</li>
+<li>Save your working copy as <code>gateway_k8s.yaml</code>.</li>
+</ul>
+<p>Make the original file read-only to remove write permissions and avoid accidental updates:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">chmod</span> a-w gateway_k8s_original.yaml</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>3. Customize the Deployment YAML:</strong></p>
+<p>Before applying the Gateway configuration to the cluster, you must modify the generated <code>gateway_k8s.yaml</code> file to align with our specific lab routing, TLS requirements, and AWS infrastructure.</p>
+<p>Open the file in your preferred text editor and make the following seven adjustments:</p>
 <ol type="1">
-<li>Accept the license agreement (<code>accept: true</code>).</li>
-<li>Reduce the <code>maxNumKafkaBrokers</code> to save cluster resources.</li>
-<li><strong>Define the Ingress Endpoint:</strong> The Operator requires a <code>spec.endpoints</code> block to know how to expose the Gateway pods to the network.</li>
+<li><strong>Accept the License:</strong> Locate the <code>ACCEPT_LICENSE</code> environment variable in the container spec and change its value to <code>"true"</code>.</li>
+<li><strong>Add Local DNS Routing:</strong> Add a <code>hostAliases</code> block under <code>spec.template.spec</code> to map your AWS Load Balancer IP address to the <code>.local.test</code> hostnames. This ensures the pod can resolve the Manager’s address internally.</li>
+<li><strong>Configure TLS Versions:</strong> Add a new environment variable named <code>TLS_VERSIONS</code> and set it to <code>"TLSv1.2,TLSv1.3"</code>. This prevents handshake failures if the AWS ALB defaults to an older security policy.</li>
+<li><strong>Set the Advertised Listener:</strong> Find the <code>KAFKA_ADVERTISED_LISTENER</code> environment variable and set it to <code>"eem-gateway.local.test:443"</code>. This dictates the exact address connecting Kafka applications will use.</li>
+<li><strong>Establish Manager Trust:</strong> Replace the default string in the <code>BACKEND_CA_CERTIFICATES</code> variable with the exact PEM contents of your ALB Server Certificate. This satisfies Java’s strict trust chain requirements for the outbound connection.</li>
+<li><strong>Reconfigure the Kubernetes Service:</strong> Scroll down to the <code>Service</code> definition. Change the <code>type</code> to <code>LoadBalancer</code>. Then, update the ports so external traffic on <code>port: 443</code> routes to the internal container <code>targetPort: 8443</code>.</li>
+<li><strong>Mount the Inbound Certificates:</strong> In the <code>Secret</code> at the bottom of the file, populate the <code>ca.crt</code>, <code>tls.crt</code>, and <code>tls.key</code> fields with your newly minted SAN-enabled certificates to secure the data plane listener.</li>
 </ol>
-<p>Open <code>gateway-deployment.yaml</code> in your text editor and modify the <code>spec</code> block.</p>
-<div class="tabset-margin-container"></div><div class="panel-tabset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" role="tab" aria-controls="tabset-3-1" aria-selected="true" href="">Option A: Production (AWS EKS)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-3-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-2" role="tab" aria-controls="tabset-3-2" aria-selected="false" href="">Option B: Lab (NGINX)</a></li></ul>
-<div class="tab-content">
-<div id="tabset-3-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-3-1-tab">
-<p><strong>Use Case:</strong> Matching the production spec on AWS EKS. We will allocate capacity for 3 brokers and define the endpoint with the ALB annotations to satisfy the webhook (though actual traffic will use our manual NLB).</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ... (inside gateway-deployment.yaml) ...</span></span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">license</span><span class="kw">:</span></span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="co">    # 1. Accept the license</span></span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">accept</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">license</span><span class="kw">:</span><span class="at"> </span><span class="st">"L-CYBH-K48BZQ"</span></span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">metric</span><span class="kw">:</span><span class="at"> </span><span class="st">"VIRTUAL_PROCESSOR_CORE"</span></span>
-<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">use</span><span class="kw">:</span><span class="at"> </span><span class="st">"EventAutomationProduction"</span></span>
-<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">managerEndpoint</span><span class="kw">:</span><span class="at"> </span><span class="st">"https://eem.server.eem.corp/gateway"</span></span>
-<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">gatewayGroupName</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group"</span></span>
-<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">gatewayID</span><span class="kw">:</span><span class="at"> </span><span class="st">"eem-gateway-prod"</span></span>
-<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">replicas</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
-<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a><span class="co">  # 2. Reduce broker capacity</span></span>
-<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">maxNumKafkaBrokers</span><span class="kw">:</span><span class="at"> </span><span class="dv">3</span></span>
-<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a><span class="co">  # 3. Define the endpoint routing</span></span>
-<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">endpoints</span><span class="kw">:</span></span>
-<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> gateway</span></span>
-<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">host</span><span class="kw">:</span><span class="at"> kafka-gateway.eem.corp</span></span>
-<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">annotations</span><span class="kw">:</span></span>
-<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"alb"</span></span>
-<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">alb.ingress.kubernetes.io/scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
-<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">alb.ingress.kubernetes.io/target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
-<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a><span class="co">  # ... rest of file remains unchanged ...</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</div>
-<div id="tabset-3-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-3-2-tab">
-<p><strong>Use Case:</strong> Saving maximum resources in the k3s lab while testing the Bitnami broker. We only need 1 broker endpoint and will route it using the NGINX controller with SSL passthrough enabled.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ... (inside gateway-deployment.yaml) ...</span></span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">license</span><span class="kw">:</span></span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="co">    # 1. Accept the license</span></span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">accept</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">license</span><span class="kw">:</span><span class="at"> </span><span class="st">"L-CYBH-K48BZQ"</span></span>
-<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">metric</span><span class="kw">:</span><span class="at"> </span><span class="st">"VIRTUAL_PROCESSOR_CORE"</span></span>
-<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">use</span><span class="kw">:</span><span class="at"> </span><span class="st">"EventAutomationProduction"</span></span>
-<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">managerEndpoint</span><span class="kw">:</span><span class="at"> </span><span class="st">"https://eem.eem-server.gym.lan/gateway"</span></span>
-<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">gatewayGroupName</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group"</span></span>
-<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">gatewayID</span><span class="kw">:</span><span class="at"> </span><span class="st">"eem-gateway-lab"</span></span>
-<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">replicas</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
-<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a><span class="co">  # 2. Reduce broker capacity</span></span>
-<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">maxNumKafkaBrokers</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
-<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a><span class="co">  # 3. Define the endpoint routing</span></span>
-<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">endpoints</span><span class="kw">:</span></span>
-<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> gateway</span></span>
-<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">host</span><span class="kw">:</span><span class="at"> kafka-gateway.gym.lan</span></span>
-<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">annotations</span><span class="kw">:</span></span>
-<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">kubernetes.io/ingress.class</span><span class="kw">:</span><span class="at"> </span><span class="st">"nginx"</span></span>
-<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">nginx.ingress.kubernetes.io/ssl-passthrough</span><span class="kw">:</span><span class="at"> </span><span class="st">"true"</span></span>
-<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a><span class="co">  # ... rest of file remains unchanged ...</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</div>
-</div>
-</div>
-<p><strong>3. Apply the Gateway CR:</strong> Once your modifications are saved, apply the YAML directly to the cluster to establish the connection:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> apply <span class="at">-f</span> gateway-deployment.yaml <span class="at">-n</span> ibm-eem</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Below is a complete, reference example of the modified <code>gateway_k8s.yaml</code> file with all seven changes applied.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> apps/v1</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> Deployment</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group-eem-gateway-lab"</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">labels</span><span class="kw">:</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">app</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group-eem-gateway-lab"</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">gatewayGroup</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group"</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">gatewayId</span><span class="kw">:</span><span class="at"> </span><span class="st">"eem-gateway-lab"</span></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">productChargedContainers</span><span class="kw">:</span><span class="at"> </span><span class="st">"manager;egw"</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">productID</span><span class="kw">:</span><span class="at"> </span><span class="st">"682b6db3fed247a098d85da5ab905b46"</span></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">productMetric</span><span class="kw">:</span><span class="at"> </span><span class="st">"VIRTUAL_PROCESSOR_CORE"</span></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">productName</span><span class="kw">:</span><span class="at"> </span><span class="st">"IBM Event Automation"</span></span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">replicas</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">selector</span><span class="kw">:</span></span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">matchLabels</span><span class="kw">:</span></span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">app</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group-eem-gateway-lab"</span></span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">gatewayGroup</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group"</span></span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">gatewayId</span><span class="kw">:</span><span class="at"> </span><span class="st">"eem-gateway-lab"</span></span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">template</span><span class="kw">:</span></span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">metadata</span><span class="kw">:</span></span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">labels</span><span class="kw">:</span></span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">app</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group-eem-gateway-lab"</span></span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">gatewayGroup</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group"</span></span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">gatewayId</span><span class="kw">:</span><span class="at"> </span><span class="st">"eem-gateway-lab"</span></span>
+<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">annotations</span><span class="kw">:</span></span>
+<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">productChargedContainers</span><span class="kw">:</span><span class="at"> </span><span class="st">"manager;egw"</span></span>
+<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">productID</span><span class="kw">:</span><span class="at"> </span><span class="st">"682b6db3fed247a098d85da5ab905b46"</span></span>
+<span id="cb13-30"><a href="#cb13-30" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">productMetric</span><span class="kw">:</span><span class="at"> </span><span class="st">"VIRTUAL_PROCESSOR_CORE"</span></span>
+<span id="cb13-31"><a href="#cb13-31" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">productName</span><span class="kw">:</span><span class="at"> </span><span class="st">"IBM Event Automation"</span></span>
+<span id="cb13-32"><a href="#cb13-32" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">spec</span><span class="kw">:</span></span>
+<span id="cb13-33"><a href="#cb13-33" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">hostAliases</span><span class="kw">:</span></span>
+<span id="cb13-34"><a href="#cb13-34" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">ip</span><span class="kw">:</span><span class="at"> </span><span class="st">"107.22.x.x"</span></span>
+<span id="cb13-35"><a href="#cb13-35" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">hostnames</span><span class="kw">:</span></span>
+<span id="cb13-36"><a href="#cb13-36" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="st">"eem.eem-server.local.test"</span></span>
+<span id="cb13-37"><a href="#cb13-37" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="st">"eem-ui.local.test"</span></span>
+<span id="cb13-38"><a href="#cb13-38" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="st">"eem-gateway.local.test"</span></span>
+<span id="cb13-39"><a href="#cb13-39" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="st">"eem-admin.local.test"</span></span>
+<span id="cb13-40"><a href="#cb13-40" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">containers</span><span class="kw">:</span></span>
+<span id="cb13-41"><a href="#cb13-41" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> egw</span></span>
+<span id="cb13-42"><a href="#cb13-42" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">image</span><span class="kw">:</span><span class="at"> icr.io/cpopen/ibm-eventendpointmanagement/egw@sha256:448ec9e5eed0bb8d6a5fbf3ab1baba5894def6e5937ec19533b3ae46d454a2db</span></span>
+<span id="cb13-43"><a href="#cb13-43" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">resources</span><span class="kw">:</span></span>
+<span id="cb13-44"><a href="#cb13-44" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">limits</span><span class="kw">:</span></span>
+<span id="cb13-45"><a href="#cb13-45" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">cpu</span><span class="kw">:</span><span class="at"> </span><span class="dv">2</span></span>
+<span id="cb13-46"><a href="#cb13-46" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">ephemeral-storage</span><span class="kw">:</span><span class="at"> 800M</span></span>
+<span id="cb13-47"><a href="#cb13-47" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">memory</span><span class="kw">:</span><span class="at"> 2Gi</span></span>
+<span id="cb13-48"><a href="#cb13-48" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">requests</span><span class="kw">:</span></span>
+<span id="cb13-49"><a href="#cb13-49" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">cpu</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
+<span id="cb13-50"><a href="#cb13-50" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">ephemeral-storage</span><span class="kw">:</span><span class="at"> 800M</span></span>
+<span id="cb13-51"><a href="#cb13-51" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">memory</span><span class="kw">:</span><span class="at"> 1Gi</span></span>
+<span id="cb13-52"><a href="#cb13-52" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">ports</span><span class="kw">:</span></span>
+<span id="cb13-53"><a href="#cb13-53" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">containerPort</span><span class="kw">:</span><span class="at"> </span><span class="dv">8443</span></span>
+<span id="cb13-54"><a href="#cb13-54" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">name</span><span class="kw">:</span><span class="at"> kafka-client</span></span>
+<span id="cb13-55"><a href="#cb13-55" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">env</span><span class="kw">:</span></span>
+<span id="cb13-56"><a href="#cb13-56" aria-hidden="true" tabindex="-1"></a><span class="co">        # Uncomment below to enable detailed SSL debugging in the gateway logs if you run into TLS handshake issues during</span></span>
+<span id="cb13-57"><a href="#cb13-57" aria-hidden="true" tabindex="-1"></a><span class="co">        # testing. This will produce verbose logs about the TLS negotiation process, which can help identify certificate trust</span></span>
+<span id="cb13-58"><a href="#cb13-58" aria-hidden="true" tabindex="-1"></a><span class="co">        # problems, protocol mismatches, or cipher suite incompatibilities.</span></span>
+<span id="cb13-59"><a href="#cb13-59" aria-hidden="true" tabindex="-1"></a><span class="co">        # - name: JAVA_TOOL_OPTIONS</span></span>
+<span id="cb13-60"><a href="#cb13-60" aria-hidden="true" tabindex="-1"></a><span class="co">        #   value: "-Djavax.net.debug=ssl,handshake"        </span></span>
+<span id="cb13-61"><a href="#cb13-61" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> TLS_VERSIONS</span></span>
+<span id="cb13-62"><a href="#cb13-62" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">value</span><span class="kw">:</span><span class="at"> </span><span class="st">"TLSv1.2,TLSv1.3"</span></span>
+<span id="cb13-63"><a href="#cb13-63" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> backendURL</span></span>
+<span id="cb13-64"><a href="#cb13-64" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">value</span><span class="kw">:</span><span class="at"> </span><span class="st">"https://eem.eem-server.local.test/gateway"</span></span>
+<span id="cb13-65"><a href="#cb13-65" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> GATEWAY_PORT</span></span>
+<span id="cb13-66"><a href="#cb13-66" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">value</span><span class="kw">:</span><span class="at"> </span><span class="st">"8443"</span></span>
+<span id="cb13-67"><a href="#cb13-67" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> KAFKA_ADVERTISED_LISTENER</span></span>
+<span id="cb13-68"><a href="#cb13-68" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">value</span><span class="kw">:</span><span class="at"> </span><span class="st">"eem-gateway.local.test:443"</span></span>
+<span id="cb13-69"><a href="#cb13-69" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> BACKEND_CA_CERTIFICATES</span></span>
+<span id="cb13-70"><a href="#cb13-70" aria-hidden="true" tabindex="-1"></a><span class="fu">          value</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb13-71"><a href="#cb13-71" aria-hidden="true" tabindex="-1"></a>            -----BEGIN CERTIFICATE-----</span>
+<span id="cb13-72"><a href="#cb13-72" aria-hidden="true" tabindex="-1"></a>            (Paste the exact contents of your ALB server cert here)</span>
+<span id="cb13-73"><a href="#cb13-73" aria-hidden="true" tabindex="-1"></a>            -----END CERTIFICATE-----</span>
+<span id="cb13-74"><a href="#cb13-74" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> API_KEY</span></span>
+<span id="cb13-75"><a href="#cb13-75" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">valueFrom</span><span class="kw">:</span></span>
+<span id="cb13-76"><a href="#cb13-76" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">secretKeyRef</span><span class="kw">:</span></span>
+<span id="cb13-77"><a href="#cb13-77" aria-hidden="true" tabindex="-1"></a><span class="at">              </span><span class="fu">key</span><span class="kw">:</span><span class="at"> apiKey</span></span>
+<span id="cb13-78"><a href="#cb13-78" aria-hidden="true" tabindex="-1"></a><span class="at">              </span><span class="fu">name</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group-eem-gateway-lab"</span></span>
+<span id="cb13-79"><a href="#cb13-79" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> LICENSE_ID</span></span>
+<span id="cb13-80"><a href="#cb13-80" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">value</span><span class="kw">:</span><span class="at"> </span><span class="st">"L-CYBH-K48BZQ"</span></span>
+<span id="cb13-81"><a href="#cb13-81" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> ACCEPT_LICENSE</span></span>
+<span id="cb13-82"><a href="#cb13-82" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">value</span><span class="kw">:</span><span class="at"> </span><span class="st">"true"</span></span>
+<span id="cb13-83"><a href="#cb13-83" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> GATEWAY_TRUST_PEM</span></span>
+<span id="cb13-84"><a href="#cb13-84" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">valueFrom</span><span class="kw">:</span></span>
+<span id="cb13-85"><a href="#cb13-85" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">secretKeyRef</span><span class="kw">:</span></span>
+<span id="cb13-86"><a href="#cb13-86" aria-hidden="true" tabindex="-1"></a><span class="at">              </span><span class="fu">key</span><span class="kw">:</span><span class="at"> ca.crt</span></span>
+<span id="cb13-87"><a href="#cb13-87" aria-hidden="true" tabindex="-1"></a><span class="at">              </span><span class="fu">name</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group-eem-gateway-lab-certs"</span></span>
+<span id="cb13-88"><a href="#cb13-88" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">volumeMounts</span><span class="kw">:</span></span>
+<span id="cb13-89"><a href="#cb13-89" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> certs</span></span>
+<span id="cb13-90"><a href="#cb13-90" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">mountPath</span><span class="kw">:</span><span class="at"> </span><span class="st">"/certs/client.pem"</span></span>
+<span id="cb13-91"><a href="#cb13-91" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">subPath</span><span class="kw">:</span><span class="at"> </span><span class="st">"tls.crt"</span></span>
+<span id="cb13-92"><a href="#cb13-92" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">readOnly</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb13-93"><a href="#cb13-93" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> certs</span></span>
+<span id="cb13-94"><a href="#cb13-94" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">mountPath</span><span class="kw">:</span><span class="at"> </span><span class="st">"/certs/client.key"</span></span>
+<span id="cb13-95"><a href="#cb13-95" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">subPath</span><span class="kw">:</span><span class="at"> </span><span class="st">"tls.key"</span></span>
+<span id="cb13-96"><a href="#cb13-96" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">readOnly</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb13-97"><a href="#cb13-97" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">volumes</span><span class="kw">:</span></span>
+<span id="cb13-98"><a href="#cb13-98" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> certs</span></span>
+<span id="cb13-99"><a href="#cb13-99" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">secret</span><span class="kw">:</span></span>
+<span id="cb13-100"><a href="#cb13-100" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">secretName</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group-eem-gateway-lab-certs"</span></span>
+<span id="cb13-101"><a href="#cb13-101" aria-hidden="true" tabindex="-1"></a><span class="pp">---</span></span>
+<span id="cb13-102"><a href="#cb13-102" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> Service</span></span>
+<span id="cb13-103"><a href="#cb13-103" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> v1</span></span>
+<span id="cb13-104"><a href="#cb13-104" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
+<span id="cb13-105"><a href="#cb13-105" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group-eem-gateway-lab"</span></span>
+<span id="cb13-106"><a href="#cb13-106" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
+<span id="cb13-107"><a href="#cb13-107" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">ports</span><span class="kw">:</span></span>
+<span id="cb13-108"><a href="#cb13-108" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> kafka-client</span></span>
+<span id="cb13-109"><a href="#cb13-109" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">protocol</span><span class="kw">:</span><span class="at"> TCP</span></span>
+<span id="cb13-110"><a href="#cb13-110" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">port</span><span class="kw">:</span><span class="at"> </span><span class="dv">443</span></span>
+<span id="cb13-111"><a href="#cb13-111" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">targetPort</span><span class="kw">:</span><span class="at"> </span><span class="dv">8443</span></span>
+<span id="cb13-112"><a href="#cb13-112" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">type</span><span class="kw">:</span><span class="at"> LoadBalancer</span></span>
+<span id="cb13-113"><a href="#cb13-113" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">sessionAffinity</span><span class="kw">:</span><span class="at"> None</span></span>
+<span id="cb13-114"><a href="#cb13-114" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">selector</span><span class="kw">:</span></span>
+<span id="cb13-115"><a href="#cb13-115" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">app</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group-eem-gateway-lab"</span></span>
+<span id="cb13-116"><a href="#cb13-116" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">gatewayGroup</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group"</span></span>
+<span id="cb13-117"><a href="#cb13-117" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">gatewayId</span><span class="kw">:</span><span class="at"> </span><span class="st">"eem-gateway-lab"</span></span>
+<span id="cb13-118"><a href="#cb13-118" aria-hidden="true" tabindex="-1"></a><span class="pp">---</span></span>
+<span id="cb13-119"><a href="#cb13-119" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> v1</span></span>
+<span id="cb13-120"><a href="#cb13-120" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> Secret</span></span>
+<span id="cb13-121"><a href="#cb13-121" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
+<span id="cb13-122"><a href="#cb13-122" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group-eem-gateway-lab-certs"</span></span>
+<span id="cb13-123"><a href="#cb13-123" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">labels</span><span class="kw">:</span></span>
+<span id="cb13-124"><a href="#cb13-124" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">app</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group-eem-gateway-lab"</span></span>
+<span id="cb13-125"><a href="#cb13-125" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">gatewayGroup</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group"</span></span>
+<span id="cb13-126"><a href="#cb13-126" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">gatewayId</span><span class="kw">:</span><span class="at"> </span><span class="st">"eem-gateway-lab"</span></span>
+<span id="cb13-127"><a href="#cb13-127" aria-hidden="true" tabindex="-1"></a><span class="fu">type</span><span class="kw">:</span><span class="at"> Opaque</span></span>
+<span id="cb13-128"><a href="#cb13-128" aria-hidden="true" tabindex="-1"></a><span class="fu">stringData</span><span class="kw">:</span></span>
+<span id="cb13-129"><a href="#cb13-129" aria-hidden="true" tabindex="-1"></a><span class="fu">  ca.crt</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb13-130"><a href="#cb13-130" aria-hidden="true" tabindex="-1"></a>    -----BEGIN CERTIFICATE-----</span>
+<span id="cb13-131"><a href="#cb13-131" aria-hidden="true" tabindex="-1"></a>    (Paste the exact contents of your rootCA.crt here)</span>
+<span id="cb13-132"><a href="#cb13-132" aria-hidden="true" tabindex="-1"></a>    -----END CERTIFICATE-----</span>
+<span id="cb13-133"><a href="#cb13-133" aria-hidden="true" tabindex="-1"></a><span class="fu">  tls.crt</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb13-134"><a href="#cb13-134" aria-hidden="true" tabindex="-1"></a>    -----BEGIN CERTIFICATE-----</span>
+<span id="cb13-135"><a href="#cb13-135" aria-hidden="true" tabindex="-1"></a>    (Paste the exact contents of your ALB Server cert here)</span>
+<span id="cb13-136"><a href="#cb13-136" aria-hidden="true" tabindex="-1"></a>    -----END CERTIFICATE-----</span>
+<span id="cb13-137"><a href="#cb13-137" aria-hidden="true" tabindex="-1"></a><span class="fu">  tls.key</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb13-138"><a href="#cb13-138" aria-hidden="true" tabindex="-1"></a>    -----BEGIN PRIVATE KEY-----</span>
+<span id="cb13-139"><a href="#cb13-139" aria-hidden="true" tabindex="-1"></a>    (Paste the exact contents of your ALB Server key here)</span>
+<span id="cb13-140"><a href="#cb13-140" aria-hidden="true" tabindex="-1"></a>    -----END PRIVATE KEY-----</span>
+<span id="cb13-141"><a href="#cb13-141" aria-hidden="true" tabindex="-1"></a><span class="pp">---</span></span>
+<span id="cb13-142"><a href="#cb13-142" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> v1</span></span>
+<span id="cb13-143"><a href="#cb13-143" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> Secret</span></span>
+<span id="cb13-144"><a href="#cb13-144" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
+<span id="cb13-145"><a href="#cb13-145" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group-eem-gateway-lab"</span></span>
+<span id="cb13-146"><a href="#cb13-146" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">labels</span><span class="kw">:</span></span>
+<span id="cb13-147"><a href="#cb13-147" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">app</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group-eem-gateway-lab"</span></span>
+<span id="cb13-148"><a href="#cb13-148" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">gatewayGroup</span><span class="kw">:</span><span class="at"> </span><span class="st">"default-group"</span></span>
+<span id="cb13-149"><a href="#cb13-149" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">gatewayId</span><span class="kw">:</span><span class="at"> </span><span class="st">"eem-gateway-lab"</span></span>
+<span id="cb13-150"><a href="#cb13-150" aria-hidden="true" tabindex="-1"></a><span class="fu">type</span><span class="kw">:</span><span class="at"> Opaque</span></span>
+<span id="cb13-151"><a href="#cb13-151" aria-hidden="true" tabindex="-1"></a><span class="fu">stringData</span><span class="kw">:</span></span>
+<span id="cb13-152"><a href="#cb13-152" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">apiKey</span><span class="kw">:</span><span class="at"> </span><span class="st">"117c8d54-a95d-415b-9d1f-d00229185d76"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>4. Deploy the Gateway Pods:</strong> If you need to make any lab-specific resource adjustments (like lowering CPU or memory limits), do so in your <code>gateway_k8s.yaml</code> working copy. Once ready, apply the file to the cluster:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> apply <span class="at">-f</span> gateway_k8s.yaml <span class="at">-n</span> ibm-eem</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="callout callout-style-default callout-tip callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -655,53 +765,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Wait a few moments, then check the <strong>Gateways</strong> page in the EEM UI. Your new gateway should appear with a “Connected” status.</p>
-</div>
-</div>
-</section>
-<section id="expose-the-gateway-layer-4-routing" class="level3">
-<h3 class="anchored" data-anchor-id="expose-the-gateway-layer-4-routing">3.4 Expose the Gateway (Layer 4 Routing)</h3>
-<p>Because Kafka relies on strict mTLS handshakes between the client and the Gateway, standard Layer 7 HTTP/S load balancing will break the connection. We must expose the Gateway pods using a Layer 4 TCP passthrough.</p>
-<div class="tabset-margin-container"></div><div class="panel-tabset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-4-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-1" role="tab" aria-controls="tabset-4-1" aria-selected="true" href="">Option A: AWS EKS (Manual NLB)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-4-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-2" role="tab" aria-controls="tabset-4-2" aria-selected="false" href="">Option B: Lab (NGINX SSL Passthrough)</a></li></ul>
-<div class="tab-content">
-<div id="tabset-4-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-4-1-tab">
-<p><strong>Use Case:</strong> The IBM Operator generated an ALB to satisfy cluster admission webhooks, but we need an actual Network Load Balancer (NLB) to handle the TCP mTLS traffic.</p>
-<p>Create a manual <code>Service</code> to provision an AWS NLB that targets the running Gateway pods directly.</p>
-<p>Create a file named <code>eem-gateway-nlb.yaml</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> v1</span></span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> Service</span></span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
-<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> eem-gateway-nlb</span></span>
-<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">namespace</span><span class="kw">:</span><span class="at"> ibm-eem</span></span>
-<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">annotations</span><span class="kw">:</span></span>
-<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"external"</span></span>
-<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-nlb-target-type</span><span class="kw">:</span><span class="at"> </span><span class="st">"ip"</span></span>
-<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-scheme</span><span class="kw">:</span><span class="at"> </span><span class="st">"internal"</span></span>
-<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol</span><span class="kw">:</span><span class="at"> </span><span class="st">"TCP"</span></span>
-<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled</span><span class="kw">:</span><span class="at"> </span><span class="st">"true"</span></span>
-<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a><span class="co">    # Anonymized enterprise tags</span></span>
-<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags</span><span class="kw">:</span><span class="at"> </span><span class="st">"Name=eem-gateway-nlb,tfc-application-group=event-streaming,tfc-technical-environment=lab"</span></span>
-<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
-<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">type</span><span class="kw">:</span><span class="at"> LoadBalancer</span></span>
-<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">ports</span><span class="kw">:</span></span>
-<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> gateway-tls</span></span>
-<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">port</span><span class="kw">:</span><span class="at"> </span><span class="dv">443</span></span>
-<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">targetPort</span><span class="kw">:</span><span class="at"> </span><span class="dv">8443</span></span>
-<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">protocol</span><span class="kw">:</span><span class="at"> TCP</span></span>
-<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">selector</span><span class="kw">:</span></span>
-<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a><span class="co">    # These labels target the Gateway pods provisioned by your EEM Custom Resource</span></span>
-<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">app.kubernetes.io/instance</span><span class="kw">:</span><span class="at"> eem-manager</span></span>
-<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">app.kubernetes.io/name</span><span class="kw">:</span><span class="at"> gateway</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><strong>Apply the NLB Service:</strong></p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> apply <span class="at">-f</span> eem-gateway-nlb.yaml</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><em>Update your DNS records so that <code>gateway.eem.corp</code> points to the new NLB hostname rather than the placeholder ALB.</em></p>
-</div>
-<div id="tabset-4-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-4-2-tab">
-<p><strong>Use Case:</strong> Using the in-cluster NGINX ingress controller we configured earlier.</p>
-<p>Because we installed the NGINX controller with the <code>--enable-ssl-passthrough=true</code> flag, and because NGINX is an exceptionally robust choice for this kind of routing, it will automatically recognize the Gateway ingress resource and pass the raw TCP connection directly to the pods.</p>
-<p>No additional manual services are required. Ensure your Gateway ingress resource contains this specific annotation: <code>nginx.ingress.kubernetes.io/ssl-passthrough: "true"</code></p>
-</div>
+<p>Wait a few moments, then check the <strong>Event Gateways</strong> page in the EEM UI. Your new gateway should appear, though it will not be able to receive external Kafka traffic until we expose it via the AWS NLB in the next step.</p>
 </div>
 </div>
 

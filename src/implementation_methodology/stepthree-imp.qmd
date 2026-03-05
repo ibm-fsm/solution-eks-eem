@@ -276,160 +276,216 @@ After adding the cluster, you will notice its state is listed as **Pending valid
 
 ### 3.3 Register the Gateway in the EEM UI
 
-Now that the infrastructure is ready, we need to register the Gateway with the Manager. This process generates a Custom Resource (CR) YAML file containing the cryptographic trust and connection details required for the two components to communicate.
+Now that the infrastructure is ready, we need to register the Gateway with the Manager. By selecting the native Kubernetes deployment option, we bypass the IBM Operator's ingress restrictions and gain the flexibility to attach an AWS Network Load Balancer (NLB) directly to the gateway pods for raw TCP passthrough.
 
-**1. Generate the Gateway YAML:**  
+**1. Generate the Gateway Configuration:**
 
-* Log into the EEM Manager UI.  
-* Navigate to the **Gateways** page from the side menu.  
-* Click **Add gateway**.  
-* When prompted for the deployment type, select **Operator-managed deployment**. This ensures the IBM Operator handles the lifecycle, scaling, and certificate rotation for the gateway.  
-* On the **Provide details** screen, configure the following settings:
+* Log into the EEM Manager UI.
+* In the navigation pane, click **Administration > Event Gateways**.
+* Click **Add gateway**.
+* Select the **Kubernetes Deployment** tile, then click **Next**.
+* Provide the configuration properties for your gateway:
 
 | Field | Configuration |
 | :--- | :--- |
-| **Gateway group** | Select **Create a new gateway group** and enter a name (e.g., `default-group`). |
-| **Gateway ID** | Provide a unique identifier for this gateway (e.g., `eem-gateway-lab` or `eem-gateway-prod`). |
-| **Replicas** | Leave at `1` for the lab, or scale up as needed for production. |
-* Click **Create** to proceed to the **Deploy Event Gateway** step. 
-* Click the copy icon on the code block to copy the generated deployment configuration and paste it into a new file named `gateway-deployment.yaml`.
+| **Gateway group** | Create or specify an existing gateway group for your new gateway (e.g., `default-group`). |
+| **Gateway ID** | Provide an ID for your new gateway that is unique within the gateway group (e.g., `eem-gateway-lab`). |
+| **Replicas** | Set to `1` for the lab environment to create a single Kubernetes replica of the gateway pod. |
+| **Server URL** | Leave this field blank. We will configure the advertised listener address directly in the Gateway Custom Resource YAML later in the deployment process. |
+| **TLS Certificates** | Leave the Gateway private key, Gateway certificate, and CA certificate fields blank. We will map our SAN-enabled certificates explicitly in the YAML in an upcoming step. |
 
-**2. Modify the Generated Configuration:**
+* Click **Create** to create the deployment YAML.
 
-Before applying the file, you must make three important modifications:
+**2. Save the Deployment Files:**
+Following IBM best practices, copy the generated YAML and save it into two separate files so you always have an unaltered backup.
 
-1. Accept the license agreement (`accept: true`).
-2. Reduce the `maxNumKafkaBrokers` to save cluster resources.
-3. **Define the Ingress Endpoint:** The Operator requires a `spec.endpoints` block to know how to expose the Gateway pods to the network.
+* Save a backup copy as `gateway_k8s_original.yaml`.
+* Save your working copy as `gateway_k8s.yaml`.
 
-Open `gateway-deployment.yaml` in your text editor and modify the `spec` block.
-
-:::{.panel-tabset}
-
-## Option A: Production (AWS EKS)
-
-**Use Case:** Matching the production spec on AWS EKS. We will allocate capacity for 3 brokers and define the endpoint with the ALB annotations to satisfy the webhook (though actual traffic will use our manual NLB).
-
-```yaml
-# ... (inside gateway-deployment.yaml) ...
-spec:
-  license:
-    # 1. Accept the license
-    accept: true
-    license: "L-CYBH-K48BZQ"
-    metric: "VIRTUAL_PROCESSOR_CORE"
-    use: "EventAutomationProduction"
-  managerEndpoint: "https://eem.server.eem.corp/gateway"
-  gatewayGroupName: "default-group"
-  gatewayID: "eem-gateway-prod"
-  replicas: 1
-  # 2. Reduce broker capacity
-  maxNumKafkaBrokers: 3
-  # 3. Define the endpoint routing
-    endpoints:
-    - name: gateway
-      host: kafka-gateway.eem.corp
-      annotations:
-        kubernetes.io/ingress.class: "alb"
-        alb.ingress.kubernetes.io/scheme: "internal"
-        alb.ingress.kubernetes.io/target-type: "ip"
-  # ... rest of file remains unchanged ...
+Make the original file read-only to remove write permissions and avoid accidental updates:
+```bash
+chmod a-w gateway_k8s_original.yaml
 ```
 
-## Option B: Lab (NGINX)
-**Use Case:** Saving maximum resources in the k3s lab while testing the Bitnami broker. We only need 1 broker endpoint and will route it using the NGINX controller with SSL passthrough enabled.
+**3. Customize the Deployment YAML:**
+
+Before applying the Gateway configuration to the cluster, you must modify the generated `gateway_k8s.yaml` file to align with our specific lab routing, TLS requirements, and AWS infrastructure. 
+
+Open the file in your preferred text editor and make the following seven adjustments:
+
+1. **Accept the License:** Locate the `ACCEPT_LICENSE` environment variable in the container spec and change its value to `"true"`.
+2. **Add Local DNS Routing:** Add a `hostAliases` block under `spec.template.spec` to map your AWS Load Balancer IP address to the `.local.test` hostnames. This ensures the pod can resolve the Manager's address internally.
+3. **Configure TLS Versions:** Add a new environment variable named `TLS_VERSIONS` and set it to `"TLSv1.2,TLSv1.3"`. This prevents handshake failures if the AWS ALB defaults to an older security policy.
+4. **Set the Advertised Listener:** Find the `KAFKA_ADVERTISED_LISTENER` environment variable and set it to `"eem-gateway.local.test:443"`. This dictates the exact address connecting Kafka applications will use.
+5. **Establish Manager Trust:** Replace the default string in the `BACKEND_CA_CERTIFICATES` variable with the exact PEM contents of your ALB Server Certificate. This satisfies Java's strict trust chain requirements for the outbound connection.
+6. **Reconfigure the Kubernetes Service:** Scroll down to the `Service` definition. Change the `type` to `LoadBalancer`. Then, update the ports so external traffic on `port: 443` routes to the internal container `targetPort: 8443`.
+7. **Mount the Inbound Certificates:** In the `Secret` at the bottom of the file, populate the `ca.crt`, `tls.crt`, and `tls.key` fields with your newly minted SAN-enabled certificates to secure the data plane listener.
+
+Below is a complete, reference example of the modified `gateway_k8s.yaml` file with all seven changes applied.
 
 ```yaml
-# ... (inside gateway-deployment.yaml) ...
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "default-group-eem-gateway-lab"
+  labels:
+    app: "default-group-eem-gateway-lab"
+    gatewayGroup: "default-group"
+    gatewayId: "eem-gateway-lab"
+  annotations:
+    productChargedContainers: "manager;egw"
+    productID: "682b6db3fed247a098d85da5ab905b46"
+    productMetric: "VIRTUAL_PROCESSOR_CORE"
+    productName: "IBM Event Automation"
 spec:
-  license:
-    # 1. Accept the license
-    accept: true
-    license: "L-CYBH-K48BZQ"
-    metric: "VIRTUAL_PROCESSOR_CORE"
-    use: "EventAutomationProduction"
-  managerEndpoint: "https://eem.eem-server.gym.lan/gateway"
-  gatewayGroupName: "default-group"
-  gatewayID: "eem-gateway-lab"
   replicas: 1
-  # 2. Reduce broker capacity
-  maxNumKafkaBrokers: 1
-  # 3. Define the endpoint routing
-  endpoints:
-    - name: gateway
-      host: kafka-gateway.gym.lan
+  selector:
+    matchLabels:
+      app: "default-group-eem-gateway-lab"
+      gatewayGroup: "default-group"
+      gatewayId: "eem-gateway-lab"
+  template:
+    metadata:
+      labels:
+        app: "default-group-eem-gateway-lab"
+        gatewayGroup: "default-group"
+        gatewayId: "eem-gateway-lab"
       annotations:
-        kubernetes.io/ingress.class: "nginx"
-        nginx.ingress.kubernetes.io/ssl-passthrough: "true"
-  # ... rest of file remains unchanged ...
+        productChargedContainers: "manager;egw"
+        productID: "682b6db3fed247a098d85da5ab905b46"
+        productMetric: "VIRTUAL_PROCESSOR_CORE"
+        productName: "IBM Event Automation"
+    spec:
+      hostAliases:
+      - ip: "107.22.x.x"
+        hostnames:
+        - "eem.eem-server.local.test"
+        - "eem-ui.local.test"
+        - "eem-gateway.local.test"
+        - "eem-admin.local.test"
+      containers:
+      - name: egw
+        image: icr.io/cpopen/ibm-eventendpointmanagement/egw@sha256:448ec9e5eed0bb8d6a5fbf3ab1baba5894def6e5937ec19533b3ae46d454a2db
+        resources:
+          limits:
+            cpu: 2
+            ephemeral-storage: 800M
+            memory: 2Gi
+          requests:
+            cpu: 1
+            ephemeral-storage: 800M
+            memory: 1Gi
+        ports:
+        - containerPort: 8443
+          name: kafka-client
+        env:
+        # Uncomment below to enable detailed SSL debugging in the gateway logs if you run into TLS handshake issues during
+        # testing. This will produce verbose logs about the TLS negotiation process, which can help identify certificate trust
+        # problems, protocol mismatches, or cipher suite incompatibilities.
+        # - name: JAVA_TOOL_OPTIONS
+        #   value: "-Djavax.net.debug=ssl,handshake"        
+        - name: TLS_VERSIONS
+          value: "TLSv1.2,TLSv1.3"
+        - name: backendURL
+          value: "https://eem.eem-server.local.test/gateway"
+        - name: GATEWAY_PORT
+          value: "8443"
+        - name: KAFKA_ADVERTISED_LISTENER
+          value: "eem-gateway.local.test:443"
+        - name: BACKEND_CA_CERTIFICATES
+          value: |
+            -----BEGIN CERTIFICATE-----
+            (Paste the exact contents of your ALB server cert here)
+            -----END CERTIFICATE-----
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: apiKey
+              name: "default-group-eem-gateway-lab"
+        - name: LICENSE_ID
+          value: "L-CYBH-K48BZQ"
+        - name: ACCEPT_LICENSE
+          value: "true"
+        - name: GATEWAY_TRUST_PEM
+          valueFrom:
+            secretKeyRef:
+              key: ca.crt
+              name: "default-group-eem-gateway-lab-certs"
+        volumeMounts:
+        - name: certs
+          mountPath: "/certs/client.pem"
+          subPath: "tls.crt"
+          readOnly: true
+        - name: certs
+          mountPath: "/certs/client.key"
+          subPath: "tls.key"
+          readOnly: true
+      volumes:
+      - name: certs
+        secret:
+          secretName: "default-group-eem-gateway-lab-certs"
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: "default-group-eem-gateway-lab"
+spec:
+  ports:
+    - name: kafka-client
+      protocol: TCP
+      port: 443
+      targetPort: 8443
+  type: LoadBalancer
+  sessionAffinity: None
+  selector:
+    app: "default-group-eem-gateway-lab"
+    gatewayGroup: "default-group"
+    gatewayId: "eem-gateway-lab"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "default-group-eem-gateway-lab-certs"
+  labels:
+    app: "default-group-eem-gateway-lab"
+    gatewayGroup: "default-group"
+    gatewayId: "eem-gateway-lab"
+type: Opaque
+stringData:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    (Paste the exact contents of your rootCA.crt here)
+    -----END CERTIFICATE-----
+  tls.crt: |
+    -----BEGIN CERTIFICATE-----
+    (Paste the exact contents of your ALB Server cert here)
+    -----END CERTIFICATE-----
+  tls.key: |
+    -----BEGIN PRIVATE KEY-----
+    (Paste the exact contents of your ALB Server key here)
+    -----END PRIVATE KEY-----
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "default-group-eem-gateway-lab"
+  labels:
+    app: "default-group-eem-gateway-lab"
+    gatewayGroup: "default-group"
+    gatewayId: "eem-gateway-lab"
+type: Opaque
+stringData:
+  apiKey: "117c8d54-a95d-415b-9d1f-d00229185d76"
 ```
 
-:::
-
-**3. Apply the Gateway CR:**
-Once your modifications are saved, apply the YAML directly to the cluster to establish the connection:
+**4. Deploy the Gateway Pods:**
+If you need to make any lab-specific resource adjustments (like lowering CPU or memory limits), do so in your `gateway_k8s.yaml` working copy. Once ready, apply the file to the cluster:
 
 ```bash
-kubectl apply -f gateway-deployment.yaml -n ibm-eem
+kubectl apply -f gateway_k8s.yaml -n ibm-eem
 ```
 
 :::{.callout-tip}
 ### Verification
-Wait a few moments, then check the **Gateways** page in the EEM UI. Your new gateway should appear with a "Connected" status.
-:::
-
-### 3.4 Expose the Gateway (Layer 4 Routing)
-
-Because Kafka relies on strict mTLS handshakes between the client and the Gateway, standard Layer 7 HTTP/S load balancing will break the connection. We must expose the Gateway pods using a Layer 4 TCP passthrough. 
-
-:::{.panel-tabset}
-
-## Option A: AWS EKS (Manual NLB)
-**Use Case:** The IBM Operator generated an ALB to satisfy cluster admission webhooks, but we need an actual Network Load Balancer (NLB) to handle the TCP mTLS traffic.
-
-Create a manual `Service` to provision an AWS NLB that targets the running Gateway pods directly.
-
-Create a file named `eem-gateway-nlb.yaml`:
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: eem-gateway-nlb
-  namespace: ibm-eem
-  annotations:
-    service.beta.kubernetes.io/aws-load-balancer-type: "external"
-    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
-    service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
-    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "TCP"
-    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
-    # Anonymized enterprise tags
-    service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "Name=eem-gateway-nlb,tfc-application-group=event-streaming,tfc-technical-environment=lab"
-spec:
-  type: LoadBalancer
-  ports:
-    - name: gateway-tls
-      port: 443
-      targetPort: 8443
-      protocol: TCP
-  selector:
-    # These labels target the Gateway pods provisioned by your EEM Custom Resource
-    app.kubernetes.io/instance: eem-manager
-    app.kubernetes.io/name: gateway
-```
-
-**Apply the NLB Service:**
-```bash
-kubectl apply -f eem-gateway-nlb.yaml
-```
-*Update your DNS records so that `gateway.eem.corp` points to the new NLB hostname rather than the placeholder ALB.*
-
-## Option B: Lab (NGINX SSL Passthrough)
-**Use Case:** Using the in-cluster NGINX ingress controller we configured earlier.
-
-Because we installed the NGINX controller with the `--enable-ssl-passthrough=true` flag, and because NGINX is an exceptionally robust choice for this kind of routing, it will automatically recognize the Gateway ingress resource and pass the raw TCP connection directly to the pods. 
-
-No additional manual services are required. Ensure your Gateway ingress resource contains this specific annotation:
-`nginx.ingress.kubernetes.io/ssl-passthrough: "true"`
-
+Wait a few moments, then check the **Event Gateways** page in the EEM UI. Your new gateway should appear, though it will not be able to receive external Kafka traffic until we expose it via the AWS NLB in the next step.
 :::

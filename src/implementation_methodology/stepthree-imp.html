@@ -259,6 +259,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#backend-kafka-provisioning" id="toc-backend-kafka-provisioning" class="nav-link active" data-scroll-target="#backend-kafka-provisioning">3.1 Backend Kafka Provisioning</a></li>
   <li><a href="#connect-the-backend-kafka-cluster" id="toc-connect-the-backend-kafka-cluster" class="nav-link" data-scroll-target="#connect-the-backend-kafka-cluster">3.2 Connect the Backend Kafka Cluster</a></li>
   <li><a href="#register-the-gateway-in-the-eem-ui" id="toc-register-the-gateway-in-the-eem-ui" class="nav-link" data-scroll-target="#register-the-gateway-in-the-eem-ui">3.3 Register the Gateway in the EEM UI</a></li>
+  <li><a href="#adding-event-sources-to-eem" id="toc-adding-event-sources-to-eem" class="nav-link" data-scroll-target="#adding-event-sources-to-eem">3.4 Adding event sources to EEM</a>
+  <ul class="collapse">
+  <li><a href="#adding-a-topic-to-produce-events" id="toc-adding-a-topic-to-produce-events" class="nav-link" data-scroll-target="#adding-a-topic-to-produce-events">Adding a Topic to Produce Events</a></li>
+  <li><a href="#adding-a-topic-to-consume-events" id="toc-adding-a-topic-to-consume-events" class="nav-link" data-scroll-target="#adding-a-topic-to-consume-events">Adding a Topic to Consume Events</a></li>
+  </ul></li>
+  <li><a href="#creating-and-publishing-options-for-event-sources" id="toc-creating-and-publishing-options-for-event-sources" class="nav-link" data-scroll-target="#creating-and-publishing-options-for-event-sources">3.5 Creating and Publishing Options for Event Sources</a></li>
   </ul>
 </nav>
     </div>
@@ -833,6 +839,108 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Wait a few moments, then check the <strong>Event Gateways</strong> page in the EEM UI. Your new gateway should appear, though it will not be able to receive external Kafka traffic until we expose it via the AWS NLB in the next step.</p>
 </div>
 </div>
+</section>
+<section id="adding-event-sources-to-eem" class="level2">
+<h2 class="anchored" data-anchor-id="adding-event-sources-to-eem">3.4 Adding event sources to EEM</h2>
+<section id="adding-a-topic-to-produce-events" class="level3">
+<h3 class="anchored" data-anchor-id="adding-a-topic-to-produce-events">Adding a Topic to Produce Events</h3>
+<p>If your Kafka application needs to write data to the Gateway, you must add the backend topic to EEM as a “Produce” event source.</p>
+<p><strong>Steps to Add a Produce Topic:</strong></p>
+<ol type="1">
+<li>Navigate to the <strong>Manage topics</strong> page in the EEM Manager UI.</li>
+<li>Click the <strong>Add topic +</strong> button in the upper right corner.</li>
+<li>On the <strong>Select the interaction</strong> screen, choose <strong>Produce events</strong> and click <strong>Next</strong>.</li>
+<li>On the <strong>Cluster connection</strong> screen, select the radio button next to your target Kafka cluster (e.g., <code>test-kafka-cluster</code>) and click <strong>Next</strong>.</li>
+<li>On the <strong>Topic selection</strong> screen, check the box next to the specific topic you want to add (e.g., <code>test-topic</code>).</li>
+<li><em>(Optional)</em> Edit the <strong>Event source name</strong>. It defaults to the topic name, but you can customize how it will appear in the EEM catalog (e.g., <code>test-topic-produce</code>).</li>
+<li>Click <strong>Add topic</strong>.</li>
+</ol>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Validation Status
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>After clicking Add topic, you will be redirected back to the Manage topics screen. Your new event source will appear in the list with a status of <strong>Pending validation</strong>. It will remain in this state until the EEM Gateway successfully connects to the backend broker and properly registers the topic.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="adding-a-topic-to-consume-events" class="level3">
+<h3 class="anchored" data-anchor-id="adding-a-topic-to-consume-events">Adding a Topic to Consume Events</h3>
+<p>If your Kafka application needs to read data from the Gateway, you must add the backend topic to EEM as a “Consume” event source.</p>
+<p><strong>Steps to Add a Consume Topic:</strong></p>
+<ol type="1">
+<li>Navigate to the <strong>Manage topics</strong> page in the EEM Manager UI.</li>
+<li>Click the <strong>Add topic +</strong> button in the upper right corner.</li>
+<li>On the <strong>Select the interaction</strong> screen, choose <strong>Consume events</strong> and click <strong>Next</strong>.</li>
+<li>On the <strong>Cluster connection</strong> screen, select the radio button next to your target Kafka cluster (e.g., <code>test-kafka-cluster</code>) and click <strong>Next</strong>.</li>
+<li>On the <strong>Topic selection</strong> screen, check the box next to the specific topic you want to add (e.g., <code>test-topic</code>).</li>
+<li><em>(Optional)</em> Edit the <strong>Event source name</strong>. It defaults to the topic name, but you can customize how it will appear in the EEM catalog (e.g., <code>test-topic-consume</code>).</li>
+<li>Click <strong>Add topic</strong>.</li>
+</ol>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Validation Status
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>After clicking Add topic, you will be redirected back to the Manage topics screen. Your new event source will appear in the list with a status of <strong>Pending validation</strong>. It will remain in this state until the EEM Gateway successfully connects to the backend broker and properly registers the topic.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="creating-and-publishing-options-for-event-sources" class="level2">
+<h2 class="anchored" data-anchor-id="creating-and-publishing-options-for-event-sources">3.5 Creating and Publishing Options for Event Sources</h2>
+<p>Once your event sources are successfully validated, you need to create an “Option” for each one. Options are how you package the event source to publish it to the catalog. They allow you to customize and govern the experience for any Kafka client that will be producing or consuming messages.</p>
+<p><strong>Steps to Create an Option:</strong></p>
+<ol type="1">
+<li>From the <strong>Manage topics</strong> page, click on the event source you just created.</li>
+<li>Navigate to the <strong>Options</strong> tab and click the <strong>Create option +</strong> button.</li>
+<li><strong>Details:</strong> Provide the basic metadata for this option.
+<ul>
+<li><strong>Option name:</strong> A clear, descriptive name for the catalog.</li>
+<li><strong>Alias:</strong> An alternative name if required by your routing or naming conventions.</li>
+<li><strong>Description:</strong> A brief summary of what this option provides to the consuming or producing applications.</li>
+</ul></li>
+<li><strong>Event data controls:</strong> You can leave these fields blank for the initial setup. This section is where you can enforce governance later by applying strict usage quotas or schema enforcement rules, depending on how the event source was originally configured.</li>
+<li><strong>Security controls:</strong> Define how clients will authenticate and gain access to this specific option.
+<ul>
+<li><strong>Authentication:</strong> Select the security protocol you want to enforce for this option (SASL, mTLS, or both).</li>
+<li><strong>Manual approval:</strong> This toggle dictates whether an EEM administrator must manually approve new application subscriptions. For initial deployment and testing, leave this set to the default <strong>Off</strong> position.</li>
+</ul></li>
+<li>Click <strong>Create</strong> to finalize the option.</li>
+</ol>
+<p><strong>Steps to Publish an Option:</strong></p>
+<p>With your Option created, the final step is to publish it to your Gateway Group so that developers can discover and subscribe to it via the EEM Catalog.</p>
+<ol type="1">
+<li>On the <strong>Options</strong> tab of your event source, locate the Option you just created and click the <strong>Publish</strong> button.</li>
+<li>A modal window will appear asking you to select the Event Gateway Groups.</li>
+<li>Select the specific Gateway Group we deployed earlier.</li>
+<li>Click <strong>Publish</strong> to deploy the Option to the Gateway.</li>
+</ol>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Intermittent Publish Failures
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If the UI throws an error the very first time you hit publish, do not worry. This typically happens because the newly created Option has not fully propagated and registered within the Manager’s internal database yet. Simply wait a few seconds and click the Publish button again.</p>
+</div>
+</div>
+<p><strong>Verify the Publication:</strong> Navigate to the <strong>Catalog</strong> using the main left hand menu. You should now see the Option you just published, officially live and ready for applications to request access!</p>
 
 
 </section>

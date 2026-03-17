@@ -561,3 +561,80 @@ kubectl apply -f gateway_k8s.yaml -n ibm-eem
 ### Verification
 Wait a few moments, then check the **Event Gateways** page in the EEM UI. Your new gateway should appear, though it will not be able to receive external Kafka traffic until we expose it via the AWS NLB in the next step.
 :::
+
+## 3.4 Adding event sources to EEM
+
+### Adding a Topic to Produce Events
+
+If your Kafka application needs to write data to the Gateway, you must add the backend topic to EEM as a "Produce" event source.
+
+**Steps to Add a Produce Topic:**
+
+1. Navigate to the **Manage topics** page in the EEM Manager UI.
+2. Click the **Add topic +** button in the upper right corner.
+3. On the **Select the interaction** screen, choose **Produce events** and click **Next**.
+4. On the **Cluster connection** screen, select the radio button next to your target Kafka cluster (e.g., `test-kafka-cluster`) and click **Next**.
+5. On the **Topic selection** screen, check the box next to the specific topic you want to add (e.g., `test-topic`). 
+6. *(Optional)* Edit the **Event source name**. It defaults to the topic name, but you can customize how it will appear in the EEM catalog (e.g., `test-topic-produce`).
+7. Click **Add topic**.
+
+:::{.callout-note}
+## Validation Status
+After clicking Add topic, you will be redirected back to the Manage topics screen. Your new event source will appear in the list with a status of **Pending validation**. It will remain in this state until the EEM Gateway successfully connects to the backend broker and properly registers the topic.
+:::
+
+---
+
+### Adding a Topic to Consume Events
+
+If your Kafka application needs to read data from the Gateway, you must add the backend topic to EEM as a "Consume" event source.
+
+**Steps to Add a Consume Topic:**
+
+1. Navigate to the **Manage topics** page in the EEM Manager UI.
+2. Click the **Add topic +** button in the upper right corner.
+3. On the **Select the interaction** screen, choose **Consume events** and click **Next**.
+4. On the **Cluster connection** screen, select the radio button next to your target Kafka cluster (e.g., `test-kafka-cluster`) and click **Next**.
+5. On the **Topic selection** screen, check the box next to the specific topic you want to add (e.g., `test-topic`). 
+6. *(Optional)* Edit the **Event source name**. It defaults to the topic name, but you can customize how it will appear in the EEM catalog (e.g., `test-topic-consume`).
+7. Click **Add topic**.
+
+:::{.callout-note}
+## Validation Status
+After clicking Add topic, you will be redirected back to the Manage topics screen. Your new event source will appear in the list with a status of **Pending validation**. It will remain in this state until the EEM Gateway successfully connects to the backend broker and properly registers the topic.
+:::
+
+## 3.5 Creating and Publishing Options for Event Sources
+
+Once your event sources are successfully validated, you need to create an "Option" for each one. Options are how you package the event source to publish it to the catalog. They allow you to customize and govern the experience for any Kafka client that will be producing or consuming messages.
+
+**Steps to Create an Option:**
+
+1. From the **Manage topics** page, click on the event source you just created.
+2. Navigate to the **Options** tab and click the **Create option +** button.
+3. **Details:** Provide the basic metadata for this option.
+    * **Option name:** A clear, descriptive name for the catalog.
+    * **Alias:** An alternative name if required by your routing or naming conventions.
+    * **Description:** A brief summary of what this option provides to the consuming or producing applications.
+4. **Event data controls:** You can leave these fields blank for the initial setup. This section is where you can enforce governance later by applying strict usage quotas or schema enforcement rules, depending on how the event source was originally configured.
+5. **Security controls:** Define how clients will authenticate and gain access to this specific option.
+    * **Authentication:** Select the security protocol you want to enforce for this option (SASL, mTLS, or both).
+    * **Manual approval:** This toggle dictates whether an EEM administrator must manually approve new application subscriptions. For initial deployment and testing, leave this set to the default **Off** position.
+6. Click **Create** to finalize the option.
+
+**Steps to Publish an Option:**
+
+With your Option created, the final step is to publish it to your Gateway Group so that developers can discover and subscribe to it via the EEM Catalog.
+
+1. On the **Options** tab of your event source, locate the Option you just created and click the **Publish** button.
+2. A modal window will appear asking you to select the Event Gateway Groups.
+3. Select the specific Gateway Group we deployed earlier.
+4. Click **Publish** to deploy the Option to the Gateway.
+
+:::{.callout-warning}
+## Intermittent Publish Failures
+If the UI throws an error the very first time you hit publish, do not worry. This typically happens because the newly created Option has not fully propagated and registered within the Manager's internal database yet. Simply wait a few seconds and click the Publish button again.
+:::
+
+**Verify the Publication:**
+Navigate to the **Catalog** using the main left hand menu. You should now see the Option you just published, officially live and ready for applications to request access!

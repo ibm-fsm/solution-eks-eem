@@ -311,7 +311,7 @@ chmod a-w gateway_k8s_original.yaml
 Because AWS dynamically generates the Network Load Balancer (NLB) hostname during provisioning, we must break the Gateway deployment into two distinct phases. You must provision the Kubernetes Service first to generate the public DNS name, and then inject that exact DNS name into the Gateway Deployment so it can correctly advertise itself to your Kafka clients.
 
 **Phase 1: Configure and Deploy the Service**
-Extract the `Service` definition from your generated configuration into a new file named `gateway-service.yaml`. Ensure the `type` is set to `LoadBalancer`. You must also explicitly define the ports for the bootstrap server and every backend broker you intend to proxy.
+Extract the `Service` definition from your generated configuration into a new file named `gateway-service.yaml`. Ensure the `type` is set to `LoadBalancer`. You must also explicitly define the ports for the bootstrap server and every backend broker you intend to proxy and add annotations to specify that this should be an AWS NLB with TCP health checks and an internet-facing scheme.
 
 Here is a sample configuration mapping the bootstrap port (443 to 8443) and two dedicated backend brokers (8444 and 8445):
 
@@ -320,6 +320,10 @@ kind: Service
 apiVersion: v1
 metadata:
   name: "default-group-eem-gateway-lab"
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "TCP"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"  
 spec:
   ports:
     - name: kafka-client-bootstrap
@@ -382,6 +386,10 @@ kind: Service
 apiVersion: v1
 metadata:
   name: "default-group-eem-gateway-lab"
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "TCP"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"  
 spec:
   ports:
     - name: kafka-client-bootstrap
@@ -638,3 +646,97 @@ If the UI throws an error the very first time you hit publish, do not worry. Thi
 
 **Verify the Publication:**
 Navigate to the **Catalog** using the main left hand menu. You should now see the Option you just published, officially live and ready for applications to request access!
+
+## 3.6 Subscribing to an Option and Producing Messages
+
+With your Option published to the Catalog, applications can now discover it and request access. By subscribing to the Option, EEM generates the unique authentication credentials required to connect to the Gateway and produce messages to your backend Kafka topic.
+
+**Steps to Subscribe:**
+
+1. Navigate to the **Catalog** using the main left-hand menu.
+2. Click on the Option you just published to view its details.
+3. Click the **Subscribe** button.
+4. You will be prompted to provide contact details. Enter your name or email address so the Gateway administrators know who owns this application connection.
+5. Click **Subscribe** to confirm.
+
+**Retrieving Your Credentials:**
+
+Upon successful subscription, you will be redirected to the **Subscription request created** page. This screen contains the critical connection details your application needs to reach the data plane.
+
+Copy the following values from this screen:
+
+* **Event endpoint server URL:** The public address of your AWS Load Balancer and the specific port.
+* **Username:** Your unique SASL username.
+* **Password:** Your generated SASL password.
+
+:::{.callout-warning}
+## Password Recovery
+The password generated on this screen is strictly non-recoverable. If you lose or navigate away from this screen without saving the password, an administrator will need to revoke these credentials and you will have to generate a new subscription. 
+:::
+
+**Testing the Connection with kcat:**
+
+You can immediately verify your credentials and produce a test message directly to the event source using `kcat`. 
+
+Replace the bracketed placeholders in the command below with the exact values you copied from the Subscription page, as well as the name of the topic you are targeting. Because we are bypassing the local certificate trust store for this quick lab test, we include the `-X enable.ssl.certificate.verification=false` flag.
+
+```bash
+echo "Hello from the EEM Gateway" | kcat -P \
+  -b "<PASTE_EVENT_ENDPOINT_SERVER_URL>" \
+  -X security.protocol=SASL_SSL \
+  -X sasl.mechanisms=PLAIN \
+  -X sasl.username="<PASTE_USERNAME>" \
+  -X sasl.password="<PASTE_PASSWORD>" \
+  -X enable.ssl.certificate.verification=false \
+  -t "<YOUR_TOPIC_NAME>"
+```
+
+If the command executes and returns you silently to the command prompt without any errors, the message was successfully authenticated by the Gateway and routed to your backend Kafka broker!
+
+## 3.7 Subscribing to an Option and Consuming Messages
+
+To read data from the Gateway, your application must subscribe to an Option that was packaged with a "Consume" event source. Just like with producing, EEM will generate unique credentials scoped specifically for read access.
+
+**Steps to Subscribe:**
+
+1. Navigate to the **Catalog** using the main left-hand menu.
+2. Click on the Consume Option you published earlier to view its details.
+3. Click the **Subscribe** button.
+4. Enter your contact details (name or email) for administrative tracking.
+5. Click **Subscribe** to confirm.
+
+**Retrieving Your Credentials:**
+
+Upon successful subscription, you will be redirected to the **Subscription request created** page. 
+
+Copy the following values from this screen:
+
+* **Event endpoint server URL:** The public address of your Gateway.
+* **Username:** Your unique SASL username.
+* **Password:** Your generated SASL password.
+
+:::{.callout-warning}
+## Password Recovery
+The password generated on this screen is strictly non-recoverable. Be sure to copy it immediately. If you lose this password, an administrator must revoke the credentials and you will need to generate a new subscription.
+:::
+
+**Testing the Connection with kcat:**
+
+Now we will pull the test message we published in the previous step right back out of the Gateway. 
+
+Replace the bracketed placeholders below with your new Consume credentials. We are using the `-C` (Consumer) flag, and we have added `-c 1` to tell `kcat` to exit cleanly after reading exactly one message.
+
+```bash
+kcat -C \
+  -b "<PASTE_EVENT_ENDPOINT_SERVER_URL>" \
+  -X security.protocol=SASL_SSL \
+  -X sasl.mechanisms=PLAIN \
+  -X sasl.username="<PASTE_USERNAME>" \
+  -X sasl.password="<PASTE_PASSWORD>" \
+  -X enable.ssl.certificate.verification=false \
+  -t "<YOUR_TOPIC_NAME>" \
+  -o earliest \
+  -c 1
+```
+
+If everything is configured correctly, your terminal will print `Hello from the EEM Gateway` and return you to the command prompt. You have now successfully validated the entire end-to-end data plane!

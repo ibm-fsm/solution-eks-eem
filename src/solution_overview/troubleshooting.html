@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2026-03-05">
+<meta name="dcterms.date" content="2026-03-17">
 
 <title>Troubleshooting &amp; Diagnostics – EEM on EKS</title>
 <style>
@@ -257,6 +257,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
    
   <ul>
   <li><a href="#enabling-debug-logging-in-the-eem-manager" id="toc-enabling-debug-logging-in-the-eem-manager" class="nav-link active" data-scroll-target="#enabling-debug-logging-in-the-eem-manager">Enabling Debug Logging in the EEM Manager</a></li>
+  <li><a href="#mtls-client-certificate-validation-fails-http-500" id="toc-mtls-client-certificate-validation-fails-http-500" class="nav-link" data-scroll-target="#mtls-client-certificate-validation-fails-http-500">mTLS Client Certificate Validation Fails (HTTP 500)</a></li>
   </ul>
 </nav>
     </div>
@@ -276,7 +277,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">March 5, 2026</p>
+      <p class="date">March 17, 2026</p>
     </div>
   </div>
   
@@ -304,6 +305,27 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <pre class="text"><code>INFO  NULL com.ibm.ei.core.config.TraceSpecConfig - [applyLoggers:69] Setting trace specification from spec variable traceSpec: com.ibm.ei:debug,io.netty.handler.ssl:debug
 
 </code></pre>
+</section>
+<section id="mtls-client-certificate-validation-fails-http-500" class="level2">
+<h2 class="anchored" data-anchor-id="mtls-client-certificate-validation-fails-http-500">mTLS Client Certificate Validation Fails (HTTP 500)</h2>
+<p><strong>Symptom</strong> When adding a backend Kafka cluster to the EEM Manager using mutual TLS (mTLS), the file upload for the client certificate and private key appears successful in the UI. However, when you click <strong>Next</strong> to proceed, the UI either spins for an extended period and eventually fails, or it fails immediately.</p>
+<p>If you inspect the EEM Manager pod logs, you will see an HTTP 500 error accompanied by a Java <code>IllegalArgumentException</code> thrown by the Base64 decoder:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode java code-with-copy"><code class="sourceCode java"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>com<span class="op">.</span><span class="fu">ibm</span><span class="op">.</span><span class="fu">ei</span><span class="op">.</span><span class="fu">backend</span><span class="op">.</span><span class="fu">core</span><span class="op">.</span><span class="fu">ingress</span><span class="op">.</span><span class="fu">handlers</span><span class="op">.</span><span class="fu">EEMFailureHandler</span> <span class="op">-</span> <span class="op">[</span>handle<span class="op">:</span><span class="dv">65</span><span class="op">]</span> API Call to<span class="op">:</span> <span class="op">/</span>api<span class="op">/</span>discovery<span class="op">/</span>validate<span class="op">-</span>bootstrap<span class="op">,</span> ended in error with status code<span class="op">:</span> <span class="dv">500</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>com<span class="op">.</span><span class="fu">ibm</span><span class="op">.</span><span class="fu">ei</span><span class="op">.</span><span class="fu">core</span><span class="op">.</span><span class="fu">LoggableException</span><span class="op">:</span> Suppressing message <span class="cf">for</span> <span class="kw">class</span> java<span class="op">.</span><span class="fu">lang</span><span class="op">.</span><span class="fu">IllegalArgumentException</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  at java<span class="op">.</span><span class="fu">base</span><span class="op">/</span>java<span class="op">.</span><span class="fu">util</span><span class="op">.</span><span class="fu">Base64</span>$Decoder<span class="op">.</span><span class="fu">decode0</span><span class="op">(</span>Unknown <span class="bu">Source</span><span class="op">)</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  at com<span class="op">.</span><span class="fu">ibm</span><span class="op">.</span><span class="fu">ei</span><span class="op">.</span><span class="fu">backend</span><span class="op">.</span><span class="fu">core</span><span class="op">.</span><span class="fu">encryption</span><span class="op">.</span><span class="fu">EncryptionUtils</span><span class="op">.</span><span class="fu">decodePEM</span><span class="op">(</span>EncryptionUtils<span class="op">.</span><span class="fu">java</span><span class="op">:</span><span class="dv">57</span><span class="op">)</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="kw">...</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Root Cause</strong> This failure occurs entirely within the EEM Manager’s memory before any network connection to the Kafka broker is attempted.</p>
+<p>When you click “Next”, the UI sends the uploaded files to the EEM Java backend. The backend utilizes a strict PEM parser for mTLS client credentials that expects a single block of Base64 text. If the uploaded certificate file contains a full certificate chain (multiple <code>-----BEGIN CERTIFICATE-----</code> and <code>-----END CERTIFICATE-----</code> blocks), the parser fails. When the backend strips the very first and very last tags of the file, it encounters the tags of the intermediate certificates in the middle. Since hyphens and English words are invalid Base64 characters, the decoder immediately crashes.</p>
+<p><strong>Resolution</strong> To resolve this, you must provide EEM with only the client leaf certificate. The backend Kafka brokers (especially in environments using NGINX ingress controllers) already possess the intermediate and root CAs in their own truststores, so passing the full chain from the client is unnecessary.</p>
+<ol type="1">
+<li>Open your original client certificate file (e.g., <code>client.crt</code> or <code>client.pem</code>) in a standard text editor.</li>
+<li>Locate the first certificate block in the file.</li>
+<li>Copy only that top block, starting exactly with <code>-----BEGIN CERTIFICATE-----</code> and ending exactly with <code>-----END CERTIFICATE-----</code>.</li>
+<li>Paste this single block into a new file and save it (e.g., <code>client-leaf.crt</code>).</li>
+<li>Return to the EEM UI, remove the previously uploaded certificate, upload this new <code>client-leaf.crt</code> file alongside your private key, and click <strong>Next</strong>.</li>
+</ol>
+<p>The Java backend will now successfully parse the file, decode the client identity, and proceed with the TLS handshake.</p>
 
 
 </section>

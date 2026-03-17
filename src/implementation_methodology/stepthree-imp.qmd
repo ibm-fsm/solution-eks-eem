@@ -22,8 +22,7 @@ The EEM Gateway acts as a secure proxy and requires a target Kafka cluster to ma
 Ensure you have the following information from your Kafka administrators:
 
 * Bootstrap server addresses.  
-* TLS certificates (if using secure connections).  
-* Authentication credentials (SCRAM, mTLS, or plain).  
+* Authentication credentials (e.g., SASL/PLAIN, SASL/SCRAM, or mTLS client certificates).
 
 ## Option B: Lab (Bitnami)
 **Use Case:** Spinning up a temporary, lightweight Kafka broker in your k3s environment to validate Gateway routing with secure SSL connections (but without the complexity of Mutual TLS).
@@ -240,7 +239,7 @@ Once the Gateway is connected, you must tell it where to route the Kafka traffic
 4. Enter the DNS name and port for the bootstrap server: `kafka.corp:443`.  
 5. If certificates are set up for the Kafka broker, an error will display saying "Multiple certificates are not trusted". Click **Accept all certificates** and then click **Next**.
 6. If your enterprise broker requires Mutual TLS (mTLS), you will be prompted on the next screen to configure your client authentication. Upload your client certificate and private key, then click **Next**.
-7. On the **Credentials** screen, if your broker uses SASL, enter those credentials here. If authentication was completely handled by your mTLS client certificates, select **No credentials required**. 
+7. On the **Credentials** screen, if your broker uses SASL, enter those credentials here. If authentication was completely handled by your mTLS client certificates, no action is needed. 
 8. Click **Create** to finish adding the cluster. 
 
 ## Option B: Lab (Bitnami)
@@ -307,22 +306,105 @@ Make the original file read-only to remove write permissions and avoid accidenta
 chmod a-w gateway_k8s_original.yaml
 ```
 
-**3. Customize the Deployment YAML:**
+**3. Two-Phase Gateway Deployment**
 
-Before applying the Gateway configuration to the cluster, you must modify the generated `gateway_k8s.yaml` file to align with our specific lab routing, TLS requirements, and AWS infrastructure. 
+Because AWS dynamically generates the Network Load Balancer (NLB) hostname during provisioning, we must break the Gateway deployment into two distinct phases. You must provision the Kubernetes Service first to generate the public DNS name, and then inject that exact DNS name into the Gateway Deployment so it can correctly advertise itself to your Kafka clients.
 
-Open the file in your preferred text editor and make the following seven adjustments:
+**Phase 1: Configure and Deploy the Service**
+Extract the `Service` definition from your generated configuration into a new file named `gateway-service.yaml`. Ensure the `type` is set to `LoadBalancer`. You must also explicitly define the ports for the bootstrap server and every backend broker you intend to proxy.
 
-1. **Accept the License:** Locate the `ACCEPT_LICENSE` environment variable in the container spec and change its value to `"true"`.
-2. **Add Local DNS Routing:** Add a `hostAliases` block under `spec.template.spec` to map your AWS Load Balancer IP address to the `.local.test` hostnames. This ensures the pod can resolve the Manager's address internally.
-3. **Configure TLS Versions:** Add a new environment variable named `TLS_VERSIONS` and set it to `"TLSv1.2,TLSv1.3"`. This prevents handshake failures if the AWS ALB defaults to an older security policy.
-4. **Set the Advertised Listener:** Find the `KAFKA_ADVERTISED_LISTENER` environment variable and set it to `"eem-gateway.local.test:443"`. This dictates the exact address connecting Kafka applications will use.
-5. **Establish Manager Trust:** Replace the default string in the `BACKEND_CA_CERTIFICATES` variable with the exact PEM contents of your ALB Server Certificate. This satisfies Java's strict trust chain requirements for the outbound connection.
-6. **Reconfigure the Kubernetes Service:** Scroll down to the `Service` definition. Change the `type` to `LoadBalancer`. Then, update the ports so external traffic on `port: 443` routes to the internal container `targetPort: 8443`.
-7. **Mount the Inbound Certificates:** In the `Secret` at the bottom of the file, populate the `ca.crt`, `tls.crt`, and `tls.key` fields with your newly minted SAN-enabled certificates to secure the data plane listener.
+Here is a sample configuration mapping the bootstrap port (443 to 8443) and two dedicated backend brokers (8444 and 8445):
 
-Below is a complete, reference example of the modified `gateway_k8s.yaml` file with all seven changes applied.
+```yaml
+kind: Service
+apiVersion: v1
+metadata:
+  name: "default-group-eem-gateway-lab"
+spec:
+  ports:
+    - name: kafka-client-bootstrap
+      protocol: TCP
+      port: 443
+      targetPort: 8443
+    - name: broker-0
+      protocol: TCP
+      port: 8444
+      targetPort: 8444
+    - name: broker-1
+      protocol: TCP
+      port: 8445
+      targetPort: 8445
+  type: LoadBalancer
+  sessionAffinity: None
+  selector:
+    app: "default-group-eem-gateway-lab"
+    gatewayGroup: "default-group"
+    gatewayId: "eem-gateway-lab"
+```
 
+Apply this file to your cluster:
+```bash
+kubectl apply -f gateway-service.yaml
+```
+
+**Phase 2: Retrieve the AWS NLB Hostname**
+Watch the service until AWS provisions the NLB and populates the `EXTERNAL-IP` field. 
+```bash
+kubectl get svc default-group-eem-gateway-lab -w
+```
+Copy the resulting `elb.amazonaws.com` hostname to your clipboard.
+
+**Phase 3: Customize the Deployment YAML**
+Open the remaining `gateway_k8s.yaml` file, which should now only contain your Deployment and Secrets. Make the following six adjustments:
+
+1. **Accept the License:** Locate the `ACCEPT_LICENSE` environment variable and change its value to `"true"`.
+2. **Add Local DNS Routing (Lab Only):** Add a `hostAliases` block under `spec.template.spec` to manually map the Manager's IP address to your `.local.test` dummy hostnames. *Note: You only need this block because we are using local hostnames in this lab. In a true production environment, these endpoints would be fully resolvable via your corporate DNS (like AWS Route 53), and this block should be removed.*
+3. **Configure TLS Versions (Optional):** Add a new environment variable named `TLS_VERSIONS` and set it to `"TLSv1.2,TLSv1.3"`. This prevents handshake failures if the AWS NLB defaults to an older security policy.
+4. **Set the Advertised Listener:** Find the `KAFKA_ADVERTISED_LISTENER` environment variable and set it to the exact AWS NLB hostname you copied in Phase 2, appended with port 443. 
+5. **Establish Manager Trust:** The Gateway must securely connect to the Manager's API to download configurations. Because Java enforces strict TLS validation, it must explicitly trust the Manager's ingress certificate. 
+    * **If using a Private/Self-Signed CA (Common in Labs):** Replace the default string in the `BACKEND_CA_CERTIFICATES` variable with the exact PEM contents of the CA that signed your Manager's ALB certificate.
+    * **If using a Public CA:** If your Manager is fronted by a certificate signed by a widely trusted public authority (like Let's Encrypt or DigiCert), Java will inherently trust it. In this case, you can leave the default value or remove the `BACKEND_CA_CERTIFICATES` variable entirely.
+6. **Mount the Inbound Certificates:** In the `Secret` blocks at the bottom of the file, populate the `tls.crt` and `tls.key` fields with your SAN-enabled certificates to secure the data plane listener. 
+    * *Note on `ca.crt`:* The `ca.crt` field is optional and is used to display the trust chain in the EEM UI for developers to download. If you choose not to provide a `ca.crt` here, you **must** also delete the entire `GATEWAY_TRUST_PEM` environment variable block from the pod spec above it. If you leave the environment variable looking for a secret key that does not exist, the pod will fail to start.
+
+:::{.callout-important}
+## AWS Load Balancer TLS Compatibility
+While the `TLS_VERSIONS` environment variable is technically optional in the base IBM documentation, it is highly recommended to explicitly set its value to `"TLSv1.2,TLSv1.3"` when deploying in an AWS EKS environment. 
+
+By default, AWS load balancers frequently apply conservative Security Policies that rely on TLS 1.2. Because the Gateway pod must initiate an outbound HTTPS connection to the Manager's load balancer to download its configurations, a strict protocol mismatch here will cause the handshake to fail, preventing the Gateway from booting. Explicitly declaring TLS 1.2 ensures the Java backend can successfully negotiate the connection with standard AWS infrastructure.
+:::
+
+Below are the complete, reference examples for both files.
+
+**gateway-service.yaml**
+```yaml
+kind: Service
+apiVersion: v1
+metadata:
+  name: "default-group-eem-gateway-lab"
+spec:
+  ports:
+    - name: kafka-client-bootstrap
+      protocol: TCP
+      port: 443
+      targetPort: 8443
+    - name: broker-0
+      protocol: TCP
+      port: 8444
+      targetPort: 8444
+    - name: broker-1
+      protocol: TCP
+      port: 8445
+      targetPort: 8445
+  type: LoadBalancer
+  sessionAffinity: None
+  selector:
+    app: "default-group-eem-gateway-lab"
+    gatewayGroup: "default-group"
+    gatewayId: "eem-gateway-lab"
+```
+
+**gateway_k8s.yaml**
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -356,7 +438,12 @@ spec:
         productMetric: "VIRTUAL_PROCESSOR_CORE"
         productName: "IBM Event Automation"
     spec:
+      # NOTE: The hostAliases block is only required for lab environments 
+      # using dummy hostnames (like .local.test) without a real DNS server. 
+      # In production with proper DNS (e.g., AWS Route 53), remove this block entirely.
       hostAliases:
+      # Enter the IP address of the load balancer or ingress controller fronting your EEM Manager. 
+      # The Gateway pod uses this IP to resolve the dummy hostnames below so it can connect to the Control Plane API.
       - ip: "107.22.x.x"
         hostnames:
         - "eem.eem-server.local.test"
@@ -379,11 +466,8 @@ spec:
         - containerPort: 8443
           name: kafka-client
         env:
-        # Uncomment below to enable detailed SSL debugging in the gateway logs if you run into TLS handshake issues during
-        # testing. This will produce verbose logs about the TLS negotiation process, which can help identify certificate trust
-        # problems, protocol mismatches, or cipher suite incompatibilities.
-        # - name: JAVA_TOOL_OPTIONS
-        #   value: "-Djavax.net.debug=ssl,handshake"        
+        # The TLS_VERSIONS variable is optional but can help prevent handshake failures if the AWS NLB defaults to an older 
+        # security policy. Adjust as needed based on your NLB configuration.
         - name: TLS_VERSIONS
           value: "TLSv1.2,TLSv1.3"
         - name: backendURL
@@ -391,11 +475,13 @@ spec:
         - name: GATEWAY_PORT
           value: "8443"
         - name: KAFKA_ADVERTISED_LISTENER
-          value: "eem-gateway.local.test:443"
+          value: "<PASTE-YOUR-NLB-HOSTNAME-HERE>:443"
+        # If the Manager's endpoint uses a Public CA, leave the default value.
+        # If using a custom lab CA or self-signed cert, paste the CA PEM block here.
         - name: BACKEND_CA_CERTIFICATES
           value: |
             -----BEGIN CERTIFICATE-----
-            (Paste the exact contents of your ALB server cert here)
+            (Paste the exact contents of your Manager CA cert here)
             -----END CERTIFICATE-----
         - name: API_KEY
           valueFrom:
@@ -406,6 +492,8 @@ spec:
           value: "L-CYBH-K48BZQ"
         - name: ACCEPT_LICENSE
           value: "true"
+        # NOTE: If you are NOT providing a ca.crt in the Secret block at the bottom 
+        # of this file, you MUST delete this entire GATEWAY_TRUST_PEM block.
         - name: GATEWAY_TRUST_PEM
           valueFrom:
             secretKeyRef:
@@ -425,23 +513,6 @@ spec:
         secret:
           secretName: "default-group-eem-gateway-lab-certs"
 ---
-kind: Service
-apiVersion: v1
-metadata:
-  name: "default-group-eem-gateway-lab"
-spec:
-  ports:
-    - name: kafka-client
-      protocol: TCP
-      port: 443
-      targetPort: 8443
-  type: LoadBalancer
-  sessionAffinity: None
-  selector:
-    app: "default-group-eem-gateway-lab"
-    gatewayGroup: "default-group"
-    gatewayId: "eem-gateway-lab"
----
 apiVersion: v1
 kind: Secret
 metadata:
@@ -452,6 +523,7 @@ metadata:
     gatewayId: "eem-gateway-lab"
 type: Opaque
 stringData:
+  # ca.crt is optional. If you remove it, delete the GATEWAY_TRUST_PEM env var above.
   ca.crt: |
     -----BEGIN CERTIFICATE-----
     (Paste the exact contents of your rootCA.crt here)

@@ -166,5 +166,27 @@
       "Implementation Methodology",
       "Gateway Deployment"
     ]
+  },
+  {
+    "objectID": "src/implementation_methodology/stepthree-imp.html#subscribing-to-an-option-and-producing-messages",
+    "href": "src/implementation_methodology/stepthree-imp.html#subscribing-to-an-option-and-producing-messages",
+    "title": "Phase 3: Gateway Deployment",
+    "section": "3.6 Subscribing to an Option and Producing Messages",
+    "text": "3.6 Subscribing to an Option and Producing Messages\nWith your Option published to the Catalog, applications can now discover it and request access. By subscribing to the Option, EEM generates the unique authentication credentials required to connect to the Gateway and produce messages to your backend Kafka topic.\nSteps to Subscribe:\n\nNavigate to the Catalog using the main left-hand menu.\nClick on the Option you just published to view its details.\nClick the Subscribe button.\nYou will be prompted to provide contact details. Enter your name or email address so the Gateway administrators know who owns this application connection.\nClick Subscribe to confirm.\n\nRetrieving Your Credentials:\nUpon successful subscription, you will be redirected to the Subscription request created page. This screen contains the critical connection details your application needs to reach the data plane.\nCopy the following values from this screen:\n\nEvent endpoint server URL: The public address of your AWS Load Balancer and the specific port.\nUsername: Your unique SASL username.\nPassword: Your generated SASL password.\n\n\n\n\n\n\n\nWarningPassword Recovery\n\n\n\nThe password generated on this screen is strictly non-recoverable. If you lose or navigate away from this screen without saving the password, an administrator will need to revoke these credentials and you will have to generate a new subscription.\n\n\nTesting the Connection with kcat:\nYou can immediately verify your credentials and produce a test message directly to the event source using kcat.\nReplace the bracketed placeholders in the command below with the exact values you copied from the Subscription page, as well as the name of the topic you are targeting. Because we are bypassing the local certificate trust store for this quick lab test, we include the -X enable.ssl.certificate.verification=false flag.\necho \"Hello from the EEM Gateway\" | kcat -P \\\n  -b \"&lt;PASTE_EVENT_ENDPOINT_SERVER_URL&gt;\" \\\n  -X security.protocol=SASL_SSL \\\n  -X sasl.mechanisms=PLAIN \\\n  -X sasl.username=\"&lt;PASTE_USERNAME&gt;\" \\\n  -X sasl.password=\"&lt;PASTE_PASSWORD&gt;\" \\\n  -X enable.ssl.certificate.verification=false \\\n  -t \"&lt;YOUR_TOPIC_NAME&gt;\"\nIf the command executes and returns you silently to the command prompt without any errors, the message was successfully authenticated by the Gateway and routed to your backend Kafka broker!",
+    "crumbs": [
+      "Implementation Methodology",
+      "Gateway Deployment"
+    ]
+  },
+  {
+    "objectID": "src/implementation_methodology/stepthree-imp.html#subscribing-to-an-option-and-consuming-messages",
+    "href": "src/implementation_methodology/stepthree-imp.html#subscribing-to-an-option-and-consuming-messages",
+    "title": "Phase 3: Gateway Deployment",
+    "section": "3.7 Subscribing to an Option and Consuming Messages",
+    "text": "3.7 Subscribing to an Option and Consuming Messages\nTo read data from the Gateway, your application must subscribe to an Option that was packaged with a “Consume” event source. Just like with producing, EEM will generate unique credentials scoped specifically for read access.\nSteps to Subscribe:\n\nNavigate to the Catalog using the main left-hand menu.\nClick on the Consume Option you published earlier to view its details.\nClick the Subscribe button.\nEnter your contact details (name or email) for administrative tracking.\nClick Subscribe to confirm.\n\nRetrieving Your Credentials:\nUpon successful subscription, you will be redirected to the Subscription request created page.\nCopy the following values from this screen:\n\nEvent endpoint server URL: The public address of your Gateway.\nUsername: Your unique SASL username.\nPassword: Your generated SASL password.\n\n\n\n\n\n\n\nWarningPassword Recovery\n\n\n\nThe password generated on this screen is strictly non-recoverable. Be sure to copy it immediately. If you lose this password, an administrator must revoke the credentials and you will need to generate a new subscription.\n\n\nTesting the Connection with kcat:\nNow we will pull the test message we published in the previous step right back out of the Gateway.\nReplace the bracketed placeholders below with your new Consume credentials. We are using the -C (Consumer) flag, and we have added -c 1 to tell kcat to exit cleanly after reading exactly one message.\nkcat -C \\\n  -b \"&lt;PASTE_EVENT_ENDPOINT_SERVER_URL&gt;\" \\\n  -X security.protocol=SASL_SSL \\\n  -X sasl.mechanisms=PLAIN \\\n  -X sasl.username=\"&lt;PASTE_USERNAME&gt;\" \\\n  -X sasl.password=\"&lt;PASTE_PASSWORD&gt;\" \\\n  -X enable.ssl.certificate.verification=false \\\n  -t \"&lt;YOUR_TOPIC_NAME&gt;\" \\\n  -o earliest \\\n  -c 1\nIf everything is configured correctly, your terminal will print Hello from the EEM Gateway and return you to the command prompt. You have now successfully validated the entire end-to-end data plane!",
+    "crumbs": [
+      "Implementation Methodology",
+      "Gateway Deployment"
+    ]
   }
 ]

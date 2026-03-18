@@ -115,6 +115,17 @@
     ]
   },
   {
+    "objectID": "src/solution_overview/troubleshooting.html#verifying-gateway-routing",
+    "href": "src/solution_overview/troubleshooting.html#verifying-gateway-routing",
+    "title": "Troubleshooting & Diagnostics",
+    "section": "Verifying Gateway Routing",
+    "text": "Verifying Gateway Routing\nBefore attempting to produce or consume messages, it is highly recommended to verify that your EEM Gateway is correctly connected to the backend cluster and properly advertising all available broker paths.\nYou can test this by using the -L (List Metadata) flag in kcat. This command connects to the bootstrap port and requests the routing map for the cluster.\nRun the Metadata Query:\nReplace the bracketed placeholders with your generated credentials and your public AWS NLB hostname. Ensure you are targeting the unprivileged bootstrap port (e.g., 8443).\nkcat -b \"&lt;PASTE_EVENT_ENDPOINT_SERVER_URL&gt;:8443\" \\\n  -X security.protocol=SASL_SSL \\\n  -X sasl.mechanisms=PLAIN \\\n  -X sasl.username=\"&lt;PASTE_USERNAME&gt;\" \\\n  -X sasl.password=\"&lt;PASTE_PASSWORD&gt;\" \\\n  -X enable.ssl.certificate.verification=false \\\n  -L\nExpected Healthy Output:\nA successful configuration will return an authentication success and list all three brokers in your high-availability setup.\nMetadata for all topics (from broker 0: sasl_ssl://...amazonaws.com:8443/0):\n 3 brokers:\n  broker 0 at k8s-ibmeem-...amazonaws.com:8443\n  broker 1 at k8s-ibmeem-...amazonaws.com:8444\n  broker 2 at k8s-ibmeem-...amazonaws.com:8445\n 1 topics:\n  topic \"your-topic\" with 3 partitions:\n    partition 0, leader 1, replicas: 1,2,0, isrs: 1,2,0\n    partition 1, leader 2, replicas: 2,0,1, isrs: 2,0,1\n    partition 2, leader 0, replicas: 0,1,2, isrs: 0,1,2\n\nCommon Configuration Errors\nIf your output does not match the healthy example above, check for these common configuration traps:\n1. Error: Connection Refused / Timeout\n\nCause: The AWS Network Load Balancer target groups are marking your pods as unhealthy, or the Gateway pod crashed during initialization.\nFix: Verify you are not using a privileged port (like 443) in your KAFKA_ADVERTISED_LISTENER variable. Non-root containers cannot bind to ports under 1024. Additionally, check your AWS Console to ensure the Target Groups for the secondary broker ports (e.g., 8444, 8445) are configured to use the primary port (8443) for health checks.\n\n2. Error: Only 1 broker is listed in the output\n\nCause: The EEM Gateway successfully connected, but it does not know how to route external traffic to the other brokers.\nFix: Check the KAFKA_ADVERTISED_LISTENER environment variable in your Gateway Deployment YAML. It must be a comma-separated list explicitly defining the public hostname and port for every single broker in the backend cluster.\n\n3. Error: Ignoring leader (X) update (During Produce/Consume)\n\nCause: The client received the metadata map, but Kubernetes or AWS is blocking the actual connection to the secondary broker ports.\nFix: Ensure that ports 8444 and 8445 are explicitly declared in the ports array of your container definition inside the Gateway Deployment YAML.",
+    "crumbs": [
+      "Solution Overview",
+      "Troubleshooting"
+    ]
+  },
+  {
     "objectID": "src/key-takeaway.html",
     "href": "src/key-takeaway.html",
     "title": "Key Takeaways",

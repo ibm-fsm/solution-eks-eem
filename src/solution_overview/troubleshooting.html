@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2026-03-17">
+<meta name="dcterms.date" content="2026-03-18">
 
 <title>Troubleshooting &amp; Diagnostics – EEM on EKS</title>
 <style>
@@ -258,6 +258,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul>
   <li><a href="#enabling-debug-logging-in-the-eem-manager" id="toc-enabling-debug-logging-in-the-eem-manager" class="nav-link active" data-scroll-target="#enabling-debug-logging-in-the-eem-manager">Enabling Debug Logging in the EEM Manager</a></li>
   <li><a href="#mtls-client-certificate-validation-fails-http-500" id="toc-mtls-client-certificate-validation-fails-http-500" class="nav-link" data-scroll-target="#mtls-client-certificate-validation-fails-http-500">mTLS Client Certificate Validation Fails (HTTP 500)</a></li>
+  <li><a href="#verifying-gateway-routing" id="toc-verifying-gateway-routing" class="nav-link" data-scroll-target="#verifying-gateway-routing">Verifying Gateway Routing</a>
+  <ul class="collapse">
+  <li><a href="#common-configuration-errors" id="toc-common-configuration-errors" class="nav-link" data-scroll-target="#common-configuration-errors">Common Configuration Errors</a></li>
+  </ul></li>
   </ul>
 </nav>
     </div>
@@ -277,7 +281,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">March 17, 2026</p>
+      <p class="date">March 18, 2026</p>
     </div>
   </div>
   
@@ -326,8 +330,53 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>Return to the EEM UI, remove the previously uploaded certificate, upload this new <code>client-leaf.crt</code> file alongside your private key, and click <strong>Next</strong>.</li>
 </ol>
 <p>The Java backend will now successfully parse the file, decode the client identity, and proceed with the TLS handshake.</p>
+</section>
+<section id="verifying-gateway-routing" class="level2">
+<h2 class="anchored" data-anchor-id="verifying-gateway-routing">Verifying Gateway Routing</h2>
+<p>Before attempting to produce or consume messages, it is highly recommended to verify that your EEM Gateway is correctly connected to the backend cluster and properly advertising all available broker paths.</p>
+<p>You can test this by using the <code>-L</code> (List Metadata) flag in <code>kcat</code>. This command connects to the bootstrap port and requests the routing map for the cluster.</p>
+<p><strong>Run the Metadata Query:</strong></p>
+<p>Replace the bracketed placeholders with your generated credentials and your public AWS NLB hostname. Ensure you are targeting the unprivileged bootstrap port (e.g., <code>8443</code>).</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kcat</span> <span class="at">-b</span> <span class="st">"&lt;PASTE_EVENT_ENDPOINT_SERVER_URL&gt;:8443"</span> <span class="dt">\</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">-X</span> security.protocol=SASL_SSL <span class="dt">\</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-X</span> sasl.mechanisms=PLAIN <span class="dt">\</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">-X</span> sasl.username=<span class="st">"&lt;PASTE_USERNAME&gt;"</span> <span class="dt">\</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">-X</span> sasl.password=<span class="st">"&lt;PASTE_PASSWORD&gt;"</span> <span class="dt">\</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">-X</span> enable.ssl.certificate.verification=false <span class="dt">\</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">-L</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Expected Healthy Output:</strong></p>
+<p>A successful configuration will return an authentication success and list all three brokers in your high-availability setup.</p>
+<pre class="text"><code>Metadata for all topics (from broker 0: sasl_ssl://...amazonaws.com:8443/0):
+ 3 brokers:
+  broker 0 at k8s-ibmeem-...amazonaws.com:8443
+  broker 1 at k8s-ibmeem-...amazonaws.com:8444
+  broker 2 at k8s-ibmeem-...amazonaws.com:8445
+ 1 topics:
+  topic "your-topic" with 3 partitions:
+    partition 0, leader 1, replicas: 1,2,0, isrs: 1,2,0
+    partition 1, leader 2, replicas: 2,0,1, isrs: 2,0,1
+    partition 2, leader 0, replicas: 0,1,2, isrs: 0,1,2</code></pre>
+<section id="common-configuration-errors" class="level3">
+<h3 class="anchored" data-anchor-id="common-configuration-errors">Common Configuration Errors</h3>
+<p>If your output does not match the healthy example above, check for these common configuration traps:</p>
+<p><strong>1. Error: Connection Refused / Timeout</strong></p>
+<ul>
+<li><strong>Cause:</strong> The AWS Network Load Balancer target groups are marking your pods as unhealthy, or the Gateway pod crashed during initialization.</li>
+<li><strong>Fix:</strong> Verify you are not using a privileged port (like <code>443</code>) in your <code>KAFKA_ADVERTISED_LISTENER</code> variable. Non-root containers cannot bind to ports under 1024. Additionally, check your AWS Console to ensure the Target Groups for the secondary broker ports (e.g., <code>8444</code>, <code>8445</code>) are configured to use the primary port (<code>8443</code>) for health checks.</li>
+</ul>
+<p><strong>2. Error: Only 1 broker is listed in the output</strong></p>
+<ul>
+<li><strong>Cause:</strong> The EEM Gateway successfully connected, but it does not know how to route external traffic to the other brokers.</li>
+<li><strong>Fix:</strong> Check the <code>KAFKA_ADVERTISED_LISTENER</code> environment variable in your Gateway <code>Deployment</code> YAML. It must be a comma-separated list explicitly defining the public hostname and port for every single broker in the backend cluster.</li>
+</ul>
+<p><strong>3. Error: Ignoring leader (X) update (During Produce/Consume)</strong></p>
+<ul>
+<li><strong>Cause:</strong> The client received the metadata map, but Kubernetes or AWS is blocking the actual connection to the secondary broker ports.</li>
+<li><strong>Fix:</strong> Ensure that ports <code>8444</code> and <code>8445</code> are explicitly declared in the <code>ports</code> array of your container definition inside the Gateway <code>Deployment</code> YAML.</li>
+</ul>
 
 
+</section>
 </section>
 
 </main> <!-- /main -->

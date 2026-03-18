@@ -72,3 +72,58 @@ To resolve this, you must provide EEM with only the client leaf certificate. The
 5. Return to the EEM UI, remove the previously uploaded certificate, upload this new `client-leaf.crt` file alongside your private key, and click **Next**. 
 
 The Java backend will now successfully parse the file, decode the client identity, and proceed with the TLS handshake.
+
+## Verifying Gateway Routing
+
+Before attempting to produce or consume messages, it is highly recommended to verify that your EEM Gateway is correctly connected to the backend cluster and properly advertising all available broker paths. 
+
+You can test this by using the `-L` (List Metadata) flag in `kcat`. This command connects to the bootstrap port and requests the routing map for the cluster.
+
+**Run the Metadata Query:**
+
+Replace the bracketed placeholders with your generated credentials and your public AWS NLB hostname. Ensure you are targeting the unprivileged bootstrap port (e.g., `8443`).
+
+```bash
+kcat -b "<PASTE_EVENT_ENDPOINT_SERVER_URL>:8443" \
+  -X security.protocol=SASL_SSL \
+  -X sasl.mechanisms=PLAIN \
+  -X sasl.username="<PASTE_USERNAME>" \
+  -X sasl.password="<PASTE_PASSWORD>" \
+  -X enable.ssl.certificate.verification=false \
+  -L
+```
+
+**Expected Healthy Output:**
+
+A successful configuration will return an authentication success and list all three brokers in your high-availability setup. 
+
+```text
+Metadata for all topics (from broker 0: sasl_ssl://...amazonaws.com:8443/0):
+ 3 brokers:
+  broker 0 at k8s-ibmeem-...amazonaws.com:8443
+  broker 1 at k8s-ibmeem-...amazonaws.com:8444
+  broker 2 at k8s-ibmeem-...amazonaws.com:8445
+ 1 topics:
+  topic "your-topic" with 3 partitions:
+    partition 0, leader 1, replicas: 1,2,0, isrs: 1,2,0
+    partition 1, leader 2, replicas: 2,0,1, isrs: 2,0,1
+    partition 2, leader 0, replicas: 0,1,2, isrs: 0,1,2
+```
+### Common Configuration Errors
+
+If your output does not match the healthy example above, check for these common configuration traps:
+
+**1. Error: Connection Refused / Timeout**
+
+* **Cause:** The AWS Network Load Balancer target groups are marking your pods as unhealthy, or the Gateway pod crashed during initialization.
+* **Fix:** Verify you are not using a privileged port (like `443`) in your `KAFKA_ADVERTISED_LISTENER` variable. Non-root containers cannot bind to ports under 1024. Additionally, check your AWS Console to ensure the Target Groups for the secondary broker ports (e.g., `8444`, `8445`) are configured to use the primary port (`8443`) for health checks.
+
+**2. Error: Only 1 broker is listed in the output**
+
+* **Cause:** The EEM Gateway successfully connected, but it does not know how to route external traffic to the other brokers.
+* **Fix:** Check the `KAFKA_ADVERTISED_LISTENER` environment variable in your Gateway `Deployment` YAML. It must be a comma-separated list explicitly defining the public hostname and port for every single broker in the backend cluster.
+
+**3. Error: Ignoring leader (X) update (During Produce/Consume)**
+
+* **Cause:** The client received the metadata map, but Kubernetes or AWS is blocking the actual connection to the secondary broker ports.
+* **Fix:** Ensure that ports `8444` and `8445` are explicitly declared in the `ports` array of your container definition inside the Gateway `Deployment` YAML.

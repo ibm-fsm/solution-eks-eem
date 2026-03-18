@@ -97,7 +97,7 @@ ssl.endpoint.identification.algorithm=\" > /tmp/client.properties && \
 ```
 
 ## Option C: Lab (Strimzi Operator)
-**Use Case:** Deploying a production-grade (but single-node) Kafka 4.1.0 cluster on EKS using the Strimzi Operator. This setup enforces **Mutual TLS (mTLS)** for all connections and uses internal ClusterIP networking for simplified lab testing.
+**Use Case:** Deploying a production-grade 3-Broker Kafka 4.1.0 cluster on EKS using the Strimzi Operator. This setup enforces **Mutual TLS (mTLS)** for all connections and uses internal ClusterIP networking for simplified lab testing.
 
 **1. Install the Strimzi Operator**
 Before creating a Kafka cluster, you must install the operator that manages the Kafka custom resources.
@@ -127,7 +127,7 @@ metadata:
   labels:
     strimzi.io/cluster: lab-broker
 spec:
-  replicas: 1
+  replicas: 3
   roles:
     - controller
     - broker
@@ -161,7 +161,12 @@ spec:
     config:
       ssl.enabled.protocols: "TLSv1.3"
       ssl.protocol: "TLSv1.3"
-      ssl.cipher.suites: "TLS_AES_256_GCM_SHA384"          
+      ssl.cipher.suites: "TLS_AES_256_GCM_SHA384"
+      offsets.topic.replication.factor: 3
+      transaction.state.log.replication.factor: 3
+      transaction.state.log.min.isr: 2
+      default.replication.factor: 3
+      min.insync.replicas: 2      
   entityOperator:
     topicOperator: {}
     userOperator: {}
@@ -205,8 +210,8 @@ metadata:
   labels:
     strimzi.io/cluster: lab-broker
 spec:
-  partitions: 1
-  replicas: 1
+  partitions: 3
+  replicas: 3
 ```
 
 Apply the topic manifest:
@@ -311,9 +316,15 @@ chmod a-w gateway_k8s_original.yaml
 Because AWS dynamically generates the Network Load Balancer (NLB) hostname during provisioning, we must break the Gateway deployment into two distinct phases. You must provision the Kubernetes Service first to generate the public DNS name, and then inject that exact DNS name into the Gateway Deployment so it can correctly advertise itself to your Kafka clients.
 
 **Phase 1: Configure and Deploy the Service**
-Extract the `Service` definition from your generated configuration into a new file named `gateway-service.yaml`. Ensure the `type` is set to `LoadBalancer`. You must also explicitly define the ports for the bootstrap server and every backend broker you intend to proxy and add annotations to specify that this should be an AWS NLB with TCP health checks and an internet-facing scheme.
 
-Here is a sample configuration mapping the bootstrap port (443 to 8443) and two dedicated backend brokers (8444 and 8445):
+Extract the `Service` definition from your generated configuration into a new file named `gateway-service.yaml`. Ensure the `type` is set to `LoadBalancer`. You must explicitly define the ports for the bootstrap server and every backend broker you intend to proxy, and add annotations to specify that this should be an AWS NLB with TCP health checks and an internet-facing scheme.
+
+:::{.callout-important}
+## The Privileged Port Restriction
+Do not configure the Gateway to advertise or bind to any port under 1024 (such as the standard HTTPS port `443`). For security, the EEM Gateway container runs as a restricted, non-root user. In Linux environments, non-root users do not have permission to bind to "privileged" ports (< 1024). Attempting to use a port like `443` in your advertised listeners will cause a fatal Java `BindException` and immediately crash the Gateway's internal port initialization loop. Always stick to unprivileged ports (e.g., `8443`, `8444`, `8445`).
+:::
+
+Here is a sample configuration mapping the bootstrap port (`8443`) and two dedicated backend brokers (`8444` and `8445`):
 
 ```yaml
 kind: Service
@@ -328,7 +339,7 @@ spec:
   ports:
     - name: kafka-client-bootstrap
       protocol: TCP
-      port: 443
+      port: 8443
       targetPort: 8443
     - name: broker-0
       protocol: TCP
@@ -394,7 +405,7 @@ spec:
   ports:
     - name: kafka-client-bootstrap
       protocol: TCP
-      port: 443
+      port: 8443
       targetPort: 8443
     - name: broker-0
       protocol: TCP
@@ -473,6 +484,10 @@ spec:
         ports:
         - containerPort: 8443
           name: kafka-client
+        - containerPort: 8444
+          name: broker-0
+        - containerPort: 8445
+          name: broker-1
         env:
         # The TLS_VERSIONS variable is optional but can help prevent handshake failures if the AWS NLB defaults to an older 
         # security policy. Adjust as needed based on your NLB configuration.
@@ -483,7 +498,7 @@ spec:
         - name: GATEWAY_PORT
           value: "8443"
         - name: KAFKA_ADVERTISED_LISTENER
-          value: "<PASTE-YOUR-NLB-HOSTNAME-HERE>:443"
+          value: "<PASTE-YOUR-NLB-HOSTNAME-HERE>:8443,<PASTE-YOUR-NLB-HOSTNAME-HERE>:8444,<PASTE-YOUR-NLB-HOSTNAME-HERE>:8445"
         # If the Manager's endpoint uses a Public CA, leave the default value.
         # If using a custom lab CA or self-signed cert, paste the CA PEM block here.
         - name: BACKEND_CA_CERTIFICATES

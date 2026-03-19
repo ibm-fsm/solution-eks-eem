@@ -311,44 +311,115 @@ Make the original file read-only to remove write permissions and avoid accidenta
 chmod a-w gateway_k8s_original.yaml
 ```
 
-**3. Two-Phase Gateway Deployment**
+**3. Three-Phase Gateway Deployment**
 
-Because AWS dynamically generates the Network Load Balancer (NLB) hostname during provisioning, we must break the Gateway deployment into two distinct phases. You must provision the Kubernetes Service first to generate the public DNS name, and then inject that exact DNS name into the Gateway Deployment so it can correctly advertise itself to your Kafka clients.
+Because AWS dynamically generates the Network Load Balancer (NLB) hostname during provisioning, we must break the Gateway deployment into three distinct phases. You must provision the Kubernetes Services first to generate the public DNS names, and then inject that exact DNS name into the Gateway Deployment so it can correctly advertise itself to your Kafka clients.
 
 **Phase 1: Configure and Deploy the Service**
 
-Extract the `Service` definition from your generated configuration into a new file named `gateway-service.yaml`. Ensure the `type` is set to `LoadBalancer`. You must explicitly define the ports for the bootstrap server and every backend broker you intend to proxy, and add annotations to specify that this should be an AWS NLB with TCP health checks and an internet-facing scheme.
+Extract the `Service` definitions from your generated configuration into a new file named `gateway-service.yaml`. Ensure the `type` is set to `LoadBalancer`. 
 
-:::{.callout-important}
-## The Privileged Port Restriction
-Do not configure the Gateway to advertise or bind to any port under 1024 (such as the standard HTTPS port `443`). For security, the EEM Gateway container runs as a restricted, non-root user. In Linux environments, non-root users do not have permission to bind to "privileged" ports (< 1024). Attempting to use a port like `443` in your advertised listeners will cause a fatal Java `BindException` and immediately crash the Gateway's internal port initialization loop. Always stick to unprivileged ports (e.g., `8443`, `8444`, `8445`).
-:::
+Because we are using the SNI Hostname routing method, you must explicitly create a separate Kubernetes Service for the bootstrap server and every backend broker you intend to proxy. Each service will generate a unique AWS NLB hostname. 
 
-Here is a sample configuration mapping the bootstrap port (`8443`) and two dedicated backend brokers (`8444` and `8445`):
+Here is a configuration mapping three dedicated load balancers for a highly available 3-broker setup, listening externally on `443` but targeting the safe internal container ports:
 
 ```yaml
+---
 kind: Service
 apiVersion: v1
 metadata:
-  name: "default-group-eem-gateway-lab"
+  name: "broker-0"
+  namespace: ibm-eem
   annotations:
-    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    # REQUIRED: Core AWS NLB routing annotations  
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
     service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "TCP"
-    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"  
+
+    # OPTIONAL: Advanced Environment Annotations
+    # Automates Route 53 DNS record creation for this specific broker
+    # external-dns.alpha.kubernetes.io/hostname: "kafka-gateway-0.ibm-eem.lab.corp-dev.com"
+    # external-dns.alpha.kubernetes.io/ttl: "300"
+    
+    # Distributes traffic evenly across all AWS availability zones
+    # service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    
+    # Forces the NLB onto specific subnets and security groups instead of relying on auto-discovery
+    # service.beta.kubernetes.io/aws-load-balancer-subnets: "subnet-xxxx,subnet-yyyy,subnet-zzzz"
+    # service.beta.kubernetes.io/aws-load-balancer-security-groups: "sg-xxxx,sg-yyyy"
+    
+    # Injects enterprise billing and ownership tags directly onto the AWS resources
+    # service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "Name=kafka-gateway-lab,business-cost-center=38320-0102"    
 spec:
   ports:
-    - name: kafka-client-bootstrap
+    - name: broker-0-listener
       protocol: TCP
-      port: 8443
+      port: 443
       targetPort: 8443
-    - name: broker-0
+  type: LoadBalancer
+  sessionAffinity: None
+  selector:
+    app: "default-group-eem-gateway-lab"
+    gatewayGroup: "default-group"
+    gatewayId: "eem-gateway-lab"
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: "broker-1"
+  namespace: ibm-eem
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "TCP"
+
+    # OPTIONAL: Advanced Environment Annotations
+    # external-dns.alpha.kubernetes.io/hostname: "kafka-gateway-1.ibm-eem.lab.corp-dev.com"
+    # external-dns.alpha.kubernetes.io/ttl: "300"
+    # service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    # service.beta.kubernetes.io/aws-load-balancer-subnets: "subnet-xxxx,subnet-yyyy,subnet-zzzz"
+    # service.beta.kubernetes.io/aws-load-balancer-security-groups: "sg-xxxx,sg-yyyy"
+    # service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "Name=kafka-gateway-lab,business-cost-center=38320-0102"    
+spec:
+  ports:
+    - name: broker-1-listener
       protocol: TCP
-      port: 8444
-      targetPort: 8444
-    - name: broker-1
+      port: 443
+      targetPort: 8443
+  type: LoadBalancer
+  sessionAffinity: None
+  selector:
+    app: "default-group-eem-gateway-lab"
+    gatewayGroup: "default-group"
+    gatewayId: "eem-gateway-lab"
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: "broker-2"
+  namespace: ibm-eem
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "TCP"
+
+    # OPTIONAL: Advanced Environment Annotations
+    # external-dns.alpha.kubernetes.io/hostname: "kafka-gateway-2.ibm-eem.lab.corp-dev.com"
+    # external-dns.alpha.kubernetes.io/ttl: "300"
+    # service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    # service.beta.kubernetes.io/aws-load-balancer-subnets: "subnet-xxxx,subnet-yyyy,subnet-zzzz"
+    # service.beta.kubernetes.io/aws-load-balancer-security-groups: "sg-xxxx,sg-yyyy"
+    # service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "Name=kafka-gateway-lab,business-cost-center=38320-0102"    
+
+spec:
+  ports:
+    - name: broker-2-listener
       protocol: TCP
-      port: 8445
-      targetPort: 8445
+      port: 443
+      targetPort: 8443
   type: LoadBalancer
   sessionAffinity: None
   selector:
@@ -363,19 +434,19 @@ kubectl apply -f gateway-service.yaml
 ```
 
 **Phase 2: Retrieve the AWS NLB Hostname**
-Watch the service until AWS provisions the NLB and populates the `EXTERNAL-IP` field. 
+Watch the services until AWS provisions the NLBs and populates the `EXTERNAL-IP` fields. 
 ```bash
-kubectl get svc default-group-eem-gateway-lab -w
+kubectl get svc broker-0 broker-1 broker-2 -n ibm-eem -w
 ```
-Copy the resulting `elb.amazonaws.com` hostname to your clipboard.
+Copy all three of the resulting `elb.amazonaws.com` hostnames to your clipboard (or your custom Route 53 DNS names if using the `external-dns` annotations).
 
 **Phase 3: Customize the Deployment YAML**
 Open the remaining `gateway_k8s.yaml` file, which should now only contain your Deployment and Secrets. Make the following six adjustments:
 
 1. **Accept the License:** Locate the `ACCEPT_LICENSE` environment variable and change its value to `"true"`.
-2. **Add Local DNS Routing (Lab Only):** Add a `hostAliases` block under `spec.template.spec` to manually map the Manager's IP address to your `.local.test` dummy hostnames. *Note: You only need this block because we are using local hostnames in this lab. In a true production environment, these endpoints would be fully resolvable via your corporate DNS (like AWS Route 53), and this block should be removed.*
+2. **Add Local DNS Routing (Lab Only):** Add a `hostAliases` block under `spec.template.spec` to manually map the Manager's IP address to your `.local.test` dummy hostnames. *Note: You only need this block because we are using local hostnames in this lab. In a true production environment, these endpoints would be fully resolvable via your corporate DNS, and this block should be removed.*
 3. **Configure TLS Versions (Optional):** Add a new environment variable named `TLS_VERSIONS` and set it to `"TLSv1.2,TLSv1.3"`. This prevents handshake failures if the AWS NLB defaults to an older security policy.
-4. **Set the Advertised Listener:** Find the `KAFKA_ADVERTISED_LISTENER` environment variable and set it to the exact AWS NLB hostname you copied in Phase 2, appended with port 443. 
+4. **Set the Advertised Listener:** Find the `KAFKA_ADVERTISED_LISTENER` environment variable. Set it to a comma-separated list of the three exact hostnames you generated in Phase 2, with each hostname appended with port `443`. 
 5. **Establish Manager Trust:** The Gateway must securely connect to the Manager's API to download configurations. Because Java enforces strict TLS validation, it must explicitly trust the Manager's ingress certificate. 
     * **If using a Private/Self-Signed CA (Common in Labs):** Replace the default string in the `BACKEND_CA_CERTIFICATES` variable with the exact PEM contents of the CA that signed your Manager's ALB certificate.
     * **If using a Public CA:** If your Manager is fronted by a certificate signed by a widely trusted public authority (like Let's Encrypt or DigiCert), Java will inherently trust it. In this case, you can leave the default value or remove the `BACKEND_CA_CERTIFICATES` variable entirely.
@@ -389,39 +460,7 @@ While the `TLS_VERSIONS` environment variable is technically optional in the bas
 By default, AWS load balancers frequently apply conservative Security Policies that rely on TLS 1.2. Because the Gateway pod must initiate an outbound HTTPS connection to the Manager's load balancer to download its configurations, a strict protocol mismatch here will cause the handshake to fail, preventing the Gateway from booting. Explicitly declaring TLS 1.2 ensures the Java backend can successfully negotiate the connection with standard AWS infrastructure.
 :::
 
-Below are the complete, reference examples for both files.
-
-**gateway-service.yaml**
-```yaml
-kind: Service
-apiVersion: v1
-metadata:
-  name: "default-group-eem-gateway-lab"
-  annotations:
-    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
-    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "TCP"
-    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"  
-spec:
-  ports:
-    - name: kafka-client-bootstrap
-      protocol: TCP
-      port: 8443
-      targetPort: 8443
-    - name: broker-0
-      protocol: TCP
-      port: 8444
-      targetPort: 8444
-    - name: broker-1
-      protocol: TCP
-      port: 8445
-      targetPort: 8445
-  type: LoadBalancer
-  sessionAffinity: None
-  selector:
-    app: "default-group-eem-gateway-lab"
-    gatewayGroup: "default-group"
-    gatewayId: "eem-gateway-lab"
-```
+Below is the complete, reference example for the Gateway deployment.
 
 **gateway_k8s.yaml**
 ```yaml
@@ -429,6 +468,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: "default-group-eem-gateway-lab"
+  namespace: ibm-eem
   labels:
     app: "default-group-eem-gateway-lab"
     gatewayGroup: "default-group"
@@ -459,7 +499,7 @@ spec:
     spec:
       # NOTE: The hostAliases block is only required for lab environments 
       # using dummy hostnames (like .local.test) without a real DNS server. 
-      # In production with proper DNS (e.g., AWS Route 53), remove this block entirely.
+      # In production with proper DNS, remove this block entirely.
       hostAliases:
       # Enter the IP address of the load balancer or ingress controller fronting your EEM Manager. 
       # The Gateway pod uses this IP to resolve the dummy hostnames below so it can connect to the Control Plane API.
@@ -482,12 +522,9 @@ spec:
             ephemeral-storage: 800M
             memory: 1Gi
         ports:
+        # SNI routing allows us to funnel all brokers through a single unprivileged internal port
         - containerPort: 8443
           name: kafka-client
-        - containerPort: 8444
-          name: broker-0
-        - containerPort: 8445
-          name: broker-1
         env:
         # The TLS_VERSIONS variable is optional but can help prevent handshake failures if the AWS NLB defaults to an older 
         # security policy. Adjust as needed based on your NLB configuration.
@@ -498,7 +535,7 @@ spec:
         - name: GATEWAY_PORT
           value: "8443"
         - name: KAFKA_ADVERTISED_LISTENER
-          value: "<PASTE-YOUR-NLB-HOSTNAME-HERE>:8443,<PASTE-YOUR-NLB-HOSTNAME-HERE>:8444,<PASTE-YOUR-NLB-HOSTNAME-HERE>:8445"
+          value: "<BROKER-0-HOSTNAME>:443,<BROKER-1-HOSTNAME>:443,<BROKER-2-HOSTNAME>:443"
         # If the Manager's endpoint uses a Public CA, leave the default value.
         # If using a custom lab CA or self-signed cert, paste the CA PEM block here.
         - name: BACKEND_CA_CERTIFICATES
@@ -540,6 +577,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: "default-group-eem-gateway-lab-certs"
+  namespace: ibm-eem
   labels:
     app: "default-group-eem-gateway-lab"
     gatewayGroup: "default-group"
@@ -553,17 +591,18 @@ stringData:
     -----END CERTIFICATE-----
   tls.crt: |
     -----BEGIN CERTIFICATE-----
-    (Paste the exact contents of your ALB Server cert here)
+    (Paste the exact contents of your Gateway cert here)
     -----END CERTIFICATE-----
   tls.key: |
     -----BEGIN PRIVATE KEY-----
-    (Paste the exact contents of your ALB Server key here)
+    (Paste the exact contents of your Gateway key here)
     -----END PRIVATE KEY-----
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: "default-group-eem-gateway-lab"
+  namespace: ibm-eem
   labels:
     app: "default-group-eem-gateway-lab"
     gatewayGroup: "default-group"
@@ -582,7 +621,7 @@ kubectl apply -f gateway_k8s.yaml -n ibm-eem
 
 :::{.callout-tip}
 ### Verification
-Wait a few moments, then check the **Event Gateways** page in the EEM UI. Your new gateway should appear, though it will not be able to receive external Kafka traffic until we expose it via the AWS NLB in the next step.
+Wait a few moments, then check the **Event Gateways** page in the EEM UI. Your new gateway should appear, though it will not be able to receive external Kafka traffic until we expose it via the AWS NLBs in the next step.
 :::
 
 ## 3.4 Adding event sources to EEM

@@ -1,0 +1,114 @@
+apiVersion: events.ibm.com/v1beta1
+kind: EventEndpointManagement
+metadata:
+  name: eem-manager
+  namespace: ${NAMESPACE}
+spec:
+  license:
+    accept: true
+    license: 'L-CYBH-K48BZQ'
+    metric: VIRTUAL_PROCESSOR_CORE
+    use: EventAutomationProduction
+  manager:
+    template:
+      pod:
+        spec:
+          containers:
+            - name: manager
+              env:
+                - name: TLS_VERSIONS
+                  value: 'TLSv1.2,TLSv1.3'
+    endpoints:
+      - name: ui
+        host: ${UI_HOSTNAME}
+        class: ${INGRESS_CLASS}
+        annotations:
+          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
+          #external-dns.alpha.kubernetes.io/hostname: ${UI_HOSTNAME}
+          #external-dns.alpha.kubernetes.io/ttl: "300"
+
+          kubernetes.io/ingress.class: ${INGRESS_CLASS}
+          alb.ingress.kubernetes.io/scheme: ${ALB_SCHEME}
+          alb.ingress.kubernetes.io/target-type: ip
+          # alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/backend-protocol: HTTPS
+          alb.ingress.kubernetes.io/success-codes: "200-399,404"
+          alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+          alb.ingress.kubernetes.io/group.name: ${ALB_GROUP_NAME}
+          # alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
+          # alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
+          # alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb"
+
+          # Replace this ARN with the value from your ACM import step
+          alb.ingress.kubernetes.io/certificate-arn: ${ACM_ARN}
+      - name: gateway
+        host: ${GATEWAY_HOSTNAME}
+        class: ${INGRESS_CLASS}
+        annotations:
+          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
+          #external-dns.alpha.kubernetes.io/hostname: ${GATEWAY_HOSTNAME}
+          #external-dns.alpha.kubernetes.io/ttl: "300"
+
+          kubernetes.io/ingress.class: ${INGRESS_CLASS}
+          alb.ingress.kubernetes.io/scheme: ${ALB_SCHEME}
+          alb.ingress.kubernetes.io/target-type: ip
+          # alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/backend-protocol: HTTPS
+          alb.ingress.kubernetes.io/success-codes: "200-399,404"
+          alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+          alb.ingress.kubernetes.io/group.name: ${ALB_GROUP_NAME}
+          # alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
+          # alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
+          # alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb"
+
+          # Replace this ARN with the value from your ACM import step
+          alb.ingress.kubernetes.io/certificate-arn: ${ACM_ARN}
+      - name: admin
+        host: ${ADMIN_HOSTNAME}
+        class: ${INGRESS_CLASS}
+        annotations:
+          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
+          #external-dns.alpha.kubernetes.io/hostname: ${ADMIN_HOSTNAME}
+          #external-dns.alpha.kubernetes.io/ttl: "300"
+          
+          kubernetes.io/ingress.class: ${INGRESS_CLASS}
+          alb.ingress.kubernetes.io/scheme: ${ALB_SCHEME}
+          alb.ingress.kubernetes.io/target-type: ip
+          # alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/backend-protocol: HTTPS
+          alb.ingress.kubernetes.io/success-codes: "200-399,404"
+          alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+          alb.ingress.kubernetes.io/group.name: ${ALB_GROUP_NAME}
+          # alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
+          # alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
+          # alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb"
+
+          # Replace this ARN with the value from your ACM import step
+          alb.ingress.kubernetes.io/certificate-arn: ${ACM_ARN}
+      - name: server
+        host: ${SERVER_HOSTNAME}
+        class: ${INGRESS_CLASS}
+        annotations:
+          # SSL Passthrough is NOT needed here; ALB TLS termination is fully supported.
+          #external-dns.alpha.kubernetes.io/hostname: ${SERVER_HOSTNAME}
+          #external-dns.alpha.kubernetes.io/ttl: "300"
+
+          kubernetes.io/ingress.class: ${INGRESS_CLASS}
+          alb.ingress.kubernetes.io/scheme: ${ALB_SCHEME}
+          alb.ingress.kubernetes.io/target-type: ip
+          # alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
+          alb.ingress.kubernetes.io/backend-protocol: HTTPS
+          alb.ingress.kubernetes.io/success-codes: "200-399,404"
+          alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+          alb.ingress.kubernetes.io/group.name: ${ALB_GROUP_NAME}
+          # alb.ingress.kubernetes.io/subnets: "subnet-xxxx, subnet-yyyy, subnet-zzzz"
+          # alb.ingress.kubernetes.io/security-groups: "eks-lab-001-eks_worker_sg, eks-lab-001-eks_cluster_sg"
+          # alb.ingress.kubernetes.io/tags: "Name=eem-lab-alb"
+
+          # Replace this ARN with the value from your ACM import step
+          alb.ingress.kubernetes.io/certificate-arn: ${ACM_ARN}
+    authConfig:
+      authType: LOCAL
+    storage:
+      storageClassName: gp2
+      type: persistent-claim

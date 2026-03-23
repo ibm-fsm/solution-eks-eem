@@ -1,0 +1,121 @@
+# ========================================================================
+# STAGE 1: PRE-REQS (Namespaces & Secrets)
+# ========================================================================
+
+# Create the Namespace
+resource "kubernetes_namespace_v1" "eem_namespace" {
+  metadata {
+    name = var.namespace
+  }
+}
+
+# Create the Image Pull Secret for IBM Entitled Registry
+resource "kubernetes_secret_v1" "ibm_entitlement_key" {
+  metadata {
+    name      = "ibm-entitlement-key"
+    namespace = kubernetes_namespace_v1.eem_namespace.metadata[0].name
+  }
+
+  type = "kubernetes.io/dockerconfigjson"
+
+  data = {
+    ".dockerconfigjson" = jsonencode({
+      auths = {
+        (var.registry_server) = {
+          username = var.registry_user
+          password = var.registry_password
+          auth     = base64encode("${var.registry_user}:${var.registry_password}")
+        }
+      }
+    })
+  }
+}
+
+# ========================================================================
+# STAGE 2: DEPLOY OPERATOR
+# ========================================================================
+
+# Install the CRDs
+# This prevents Helm ownership lockouts in multi-tenant clusters
+resource "null_resource" "eem_crds" {
+  triggers = {
+    crd_version = var.crd_chart_version
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      helm repo add ${var.helm_repo_name} ${var.helm_repo_url}
+      helm repo update
+      helm template eem-crds ${var.helm_repo_name}/${var.crd_chart_name} --version ${var.crd_chart_version} | kubectl apply --kubeconfig ${var.kubeconfig_path} --context ${var.kube_context} -f -
+    EOT
+  }
+}
+
+# Install the Operator
+resource "helm_release" "eem_operator" {
+  name       = var.operator_chart_name
+  repository = var.helm_repo_url
+  chart      = var.operator_chart_name
+  version    = var.operator_chart_version
+  namespace  = kubernetes_namespace_v1.eem_namespace.metadata[0].name
+
+  wait = true
+
+  # Ensure CRDs are fully deployed before the Operator starts
+  depends_on = [null_resource.eem_crds]
+}
+
+# ========================================================================
+# STAGE 3: DEPLOY INSTANCE (The Magic Templating Step)
+# ========================================================================
+
+resource "kubectl_manifest" "eem_manager_instance" {
+  yaml_body = templatefile("${path.module}/templates/eem-manager.yaml.tftpl", {
+    NAMESPACE        = kubernetes_namespace_v1.eem_namespace.metadata[0].name
+    UI_HOSTNAME      = var.ui_hostname
+    ADMIN_HOSTNAME   = var.admin_hostname
+    GATEWAY_HOSTNAME = var.gateway_hostname
+    SERVER_HOSTNAME  = var.server_hostname
+    INGRESS_CLASS    = var.ingress_class
+    ALB_SCHEME       = var.alb_scheme
+    ALB_GROUP_NAME   = var.alb_group_name
+    ACM_ARN          = var.acm_arn
+  })
+
+  # Ensure the Operator is fully running before we try to create an EventEndpointManagement CR
+  depends_on = [helm_release.eem_operator]
+}
+
+# ========================================================================
+# STAGE 4: CONFIGURE ROLES
+# ========================================================================
+
+# Because the IBM Operator auto-generates the role secrets *after* the instance 
+# starts, we use a null_resource to run your exact patching commands against them.
+resource "null_resource" "patch_eem_roles" {
+  # This triggers the patch every time the Manager instance YAML changes
+  triggers = {
+    manager_manifest_sha = sha256(kubectl_manifest.eem_manager_instance.yaml_body)
+  }
+
+  depends_on = [kubectl_manifest.eem_manager_instance]
+
+  provisioner "local-exec" {
+    command = <<EOT
+      echo "Waiting for Operator to generate default secrets..."
+      sleep 45
+
+      echo "Patching user credentials..."
+      kubectl patch secret eem-manager-ibm-eem-user-credentials \
+        --namespace ${var.namespace} \
+        --type='json' \
+        -p="[{\"op\" : \"replace\" ,\"path\" : \"/data/user-credentials.json\" ,\"value\" : \"$(cat ${path.module}/config/myusers.json | base64 -w 0)\"}]"
+
+      echo "Patching role mappings..."
+      kubectl patch secret eem-manager-ibm-eem-user-roles \
+        --namespace ${var.namespace} \
+        --type='json' \
+        -p="[{\"op\" : \"replace\" ,\"path\" : \"/data/user-mapping.json\" ,\"value\" : \"$(cat ${path.module}/config/myroles.json | base64 -w 0)\"}]"
+    EOT
+  }
+}

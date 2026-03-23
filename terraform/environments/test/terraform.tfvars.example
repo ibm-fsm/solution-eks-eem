@@ -1,0 +1,7 @@
+# This file contains example variable values for the test environment. Copy this file to terraform.tfvars and update the values as needed.
+
+# The registry_password variable should be set to either your IBM Entitlement Key or the password for your private container registry, depending on how you are pulling the EEM Manager image. If you are using the public image from the IBM Container Registry, use your IBM Entitlement Key. If you are using a private registry, use the appropriate password for that registry.
+registry_password = "my-ibm-entitlement-key-or-private-registry-password"
+
+# If you are using ACM for TLS certificates, provide the ARN of your certificate here.
+acm_arn = "arn:aws:acm:us-east-1:123456789012:certificate/abcdefg-1234-5678-abcd-1234567890ab"

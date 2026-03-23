@@ -18,10 +18,16 @@ variable "namespace" {
 # Container Registry (IBM Entitled Registry)
 # ------------------------------------------------------------------------
 
-variable "registry_server" {
+variable "public_registry_server" {
   type        = string
-  description = "The container registry server"
-  default     = "cp.icr.io"
+  description = "The registry server for public EEM images"
+  default     = "icr.io" 
+}
+
+variable "private_registry_server" {
+  type        = string
+  description = "The registry server for private/entitled EEM images"
+  default     = "cp.icr.io" 
 }
 
 variable "registry_user" {
@@ -132,4 +138,16 @@ variable "kubeconfig_path" {
   type        = string
   description = "Path to the kubeconfig file for local-exec commands"
   default     = "~/.kube/config"
+}
+
+variable "public_registry_path" {
+  type        = string
+  description = "The repository path for the public EEM images"
+  default     = "cpopen/" 
+}
+
+variable "private_registry_path" {
+  type        = string
+  description = "The repository path for the private EEM images"
+  default     = "cp/ibm-eventendpointmanagement/" 
 }

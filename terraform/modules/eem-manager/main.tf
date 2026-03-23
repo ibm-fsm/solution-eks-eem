@@ -21,7 +21,8 @@ resource "kubernetes_secret_v1" "ibm_entitlement_key" {
   data = {
     ".dockerconfigjson" = jsonencode({
       auths = {
-        (var.registry_server) = {
+        # Update this line to use the private server variable!
+        (var.private_registry_server) = { 
           username = var.registry_user
           password = var.registry_password
           auth     = base64encode("${var.registry_user}:${var.registry_password}")
@@ -60,6 +61,19 @@ resource "helm_release" "eem_operator" {
   namespace  = kubernetes_namespace_v1.eem_namespace.metadata[0].name
 
   wait = true
+
+# Inject the custom values.yaml for air-gapped registries
+  values = [
+    templatefile("${path.module}/templates/values.yaml.tftpl", {
+      PUBLIC_REGISTRY_SERVER  = var.public_registry_server
+      PRIVATE_REGISTRY_SERVER = var.private_registry_server    
+      PUBLIC_REGISTRY_PATH  = var.public_registry_path
+      PRIVATE_REGISTRY_PATH = var.private_registry_path
+      OPERATOR_VERSION = var.operator_chart_version
+      # Dynamically grab the name of the secret we created in step 1
+      PULL_SECRET_NAME = kubernetes_secret_v1.ibm_entitlement_key.metadata[0].name 
+    })
+  ]
 
   # Ensure CRDs are fully deployed before the Operator starts
   depends_on = [null_resource.eem_crds]

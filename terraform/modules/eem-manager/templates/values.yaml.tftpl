@@ -1,0 +1,12 @@
+public:
+  repo: ${PUBLIC_REGISTRY_SERVER}
+  path: ${PUBLIC_REGISTRY_PATH}
+private:
+  repo: ${PRIVATE_REGISTRY_SERVER}
+  path: ${PRIVATE_REGISTRY_PATH}
+
+images:
+  operator: ibm-eventendpointmanagement-operator:${OPERATOR_VERSION}
+  eemManager: eim-backend:${OPERATOR_VERSION}
+  egw: ibm-eventendpointmanagement/egw:${OPERATOR_VERSION}
+  tutorialegw: egw-tutorial:${OPERATOR_VERSION}

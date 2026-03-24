@@ -117,13 +117,34 @@ resource "null_resource" "patch_eem_roles" {
   provisioner "local-exec" {
     command = <<EOT
       echo "Waiting for Operator to generate default secrets..."
-      sleep 45
+      
+      TIMEOUT=300 # 5 minute maximum wait time
+      INTERVAL=5  # Check every 5 seconds
+      ELAPSED=0
+      
+      # Actively poll the Kubernetes API until the secret is found
+      while ! kubectl get secret eem-manager-ibm-eem-user-credentials \
+        --namespace ${var.namespace} \
+        --kubeconfig ${var.kubeconfig_path} \
+        --context ${var.kube_context} >/dev/null 2>&1; do
+        
+        if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
+          echo "ERROR: Timeout reached! The Operator failed to create the secrets."
+          exit 1
+        fi
+        
+        echo "Secrets not ready yet. Waiting $INTERVAL seconds... ($ELAPSED/$TIMEOUT)"
+        sleep $INTERVAL
+        ELAPSED=$((ELAPSED + INTERVAL))
+      done
 
+      echo "Secrets generated successfully!"
+      
       echo "Patching user credentials..."
       kubectl patch secret eem-manager-ibm-eem-user-credentials \
         --namespace ${var.namespace} \
         --kubeconfig ${var.kubeconfig_path} \
-        --context ${var.kube_context} \        
+        --context ${var.kube_context} \
         --type='json' \
         -p="[{\"op\" : \"replace\" ,\"path\" : \"/data/user-credentials.json\" ,\"value\" : \"$(cat ${path.module}/config/myusers.json | base64 -w 0)\"}]"
 

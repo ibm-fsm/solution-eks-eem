@@ -122,12 +122,16 @@ resource "null_resource" "patch_eem_roles" {
       echo "Patching user credentials..."
       kubectl patch secret eem-manager-ibm-eem-user-credentials \
         --namespace ${var.namespace} \
+        --kubeconfig ${var.kubeconfig_path} \
+        --context ${var.kube_context} \        
         --type='json' \
         -p="[{\"op\" : \"replace\" ,\"path\" : \"/data/user-credentials.json\" ,\"value\" : \"$(cat ${path.module}/config/myusers.json | base64 -w 0)\"}]"
 
       echo "Patching role mappings..."
       kubectl patch secret eem-manager-ibm-eem-user-roles \
         --namespace ${var.namespace} \
+        --kubeconfig ${var.kubeconfig_path} \
+        --context ${var.kube_context} \
         --type='json' \
         -p="[{\"op\" : \"replace\" ,\"path\" : \"/data/user-mapping.json\" ,\"value\" : \"$(cat ${path.module}/config/myroles.json | base64 -w 0)\"}]"
     EOT

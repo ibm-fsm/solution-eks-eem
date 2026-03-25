@@ -1,0 +1,21 @@
+{
+    "type": "kafka",
+    "name": "Trade Signals Producer",
+    "contact": "ai-ops@bankcorp.com",
+    "description": "Real-time AI-generated trade signals and execution recommendations produced by BankCorp Foundry models for ingestion.",
+    "tags": [
+        "trading",
+        "bankcorp",
+        "ai-signals",
+        "json"
+    ],
+    "encoding": "application/json",
+    "sampleMessages": [],
+    "capabilities": [
+        "produce"
+    ],
+    "clusterId": "CLUSTERID",
+    "topic": {
+        "name": "test-topic"
+    }
+}

@@ -1,0 +1,22 @@
+{
+    "name": "Core Transactions (Strimzi EKS)",
+    "bootstrapServers": [
+        {
+            "host": "${KAFKA_BOOTSTRAP_HOST}",
+            "port": 9093,
+            "ssl": true,
+            "certificates": [
+                {
+                    "pem": "${KAFKA_CA_CERT}"
+                }
+            ]
+        }
+    ],
+    "credentials": {
+        "type": "MTLS",
+        "data": {
+            "certificate": "${KAFKA_CLIENT_CERT}",
+            "key": "${KAFKA_CLIENT_KEY}"
+        }
+    }
+}

@@ -1,7 +1,7 @@
 locals {
   # jsonencode safely handles all the multi-line certificate escaping automatically
   rendered_cluster_json = jsonencode({
-    name = "Truist Core Transactions (Strimzi EKS)"
+    name = "Core Transactions (Strimzi EKS)"
     bootstrapServers = [
       {
         host = var.kafka_bootstrap_host

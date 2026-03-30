@@ -24,3 +24,8 @@ variable "custom_hostnames" {
   description = "Optional list of predefined Route 53 hostnames. If left empty, AWS generated hostnames will be output."
   default     = []
 }
+
+variable "backend_url" {
+  type        = string
+  description = "The gateway endpoint on the EEM Manager (e.g., https://eem-gateway.<dns>). The Gateway pod uses this Control Plane URL to authenticate and fetch its configuration."
+}

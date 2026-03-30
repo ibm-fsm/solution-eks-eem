@@ -36,11 +36,9 @@ graph TD
 
         subgraph GatewayGrp[Gateway Group]
             GwService[Service: LoadBalancer]
-            GwIngress[Ingress: Gateway<br>Ignored Path]
             GwPods((Gateway Pod))
             
             GwService --> GwPods
-            GwIngress -.->|Ignored| GwPods
         end
         
         Kafka[(Internal Kafka Brokers)]
@@ -56,16 +54,12 @@ graph TD
     ALB --> IngressAdmin
     ALB --> IngressAuth
     
-    %% The generated but unused path
-    ALB -.->|Unused / Bypassed| GwIngress
-
     %% NLB Routing
     NLB -->|SSL Passthrough| GwService
 
     %% Internal Gateway to Kafka Routing
     GwPods -->|TCP| Kafka
-    
-    %% Styling for ignored components
-    classDef ignored stroke-dasharray: 5 5, fill:#eee, color:#999, stroke:#999;
-    class GwIngress ignored;
+
+    %% Control Plane / Gateway Registration Routing
+    GwPods -.->|HTTPS: /gateway/register| IngressAuth
 ```

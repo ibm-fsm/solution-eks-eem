@@ -33,3 +33,4 @@ terraform.rc
 
 # Ignore plan output files
 *.tfplan
+**/*.quarto_ipynb

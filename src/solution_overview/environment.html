@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2026-03-30">
+<meta name="dcterms.date" content="2026-04-02">
 
 <title>Environment Architecture – EEM on EKS</title>
 <style>
@@ -240,7 +240,7 @@ ul.task-list li input[type="checkbox"] {
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">March 30, 2026</p>
+      <p class="date">April 2, 2026</p>
     </div>
   </div>
   
@@ -286,11 +286,9 @@ ul.task-list li input[type="checkbox"] {
 
         subgraph GatewayGrp[Gateway Group]
             GwService[Service: LoadBalancer]
-            GwIngress[Ingress: Gateway&lt;br&gt;Ignored Path]
             GwPods((Gateway Pod))
             
             GwService --&gt; GwPods
-            GwIngress -.-&gt;|Ignored| GwPods
         end
         
         Kafka[(Internal Kafka Brokers)]
@@ -306,18 +304,14 @@ ul.task-list li input[type="checkbox"] {
     ALB --&gt; IngressAdmin
     ALB --&gt; IngressAuth
     
-    %% The generated but unused path
-    ALB -.-&gt;|Unused / Bypassed| GwIngress
-
     %% NLB Routing
     NLB --&gt;|SSL Passthrough| GwService
 
     %% Internal Gateway to Kafka Routing
     GwPods --&gt;|TCP| Kafka
-    
-    %% Styling for ignored components
-    classDef ignored stroke-dasharray: 5 5, fill:#eee, color:#999, stroke:#999;
-    class GwIngress ignored;
+
+    %% Control Plane / Gateway Registration Routing
+    GwPods -.-&gt;|HTTPS: /gateway/register| IngressAuth
 </pre>
 </div>
 <p></p></figure><p></p>

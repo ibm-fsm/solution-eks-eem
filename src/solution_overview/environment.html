@@ -221,8 +221,25 @@ ul.task-list li input[type="checkbox"] {
 </nav>
 <div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
-        
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#logical-topology" id="toc-logical-topology" class="nav-link active" data-scroll-target="#logical-topology">Logical Topology</a></li>
+  <li><a href="#component-matrix" id="toc-component-matrix" class="nav-link" data-scroll-target="#component-matrix">Component Matrix</a></li>
+  <li><a href="#bill-of-materials" id="toc-bill-of-materials" class="nav-link" data-scroll-target="#bill-of-materials">Bill of Materials</a>
+  <ul class="collapse">
+  <li><a href="#aws-infrastructure-eks-bound" id="toc-aws-infrastructure-eks-bound" class="nav-link" data-scroll-target="#aws-infrastructure-eks-bound">AWS Infrastructure (EKS Bound)</a></li>
+  <li><a href="#enterprise-it-prerequisites" id="toc-enterprise-it-prerequisites" class="nav-link" data-scroll-target="#enterprise-it-prerequisites">Enterprise IT Prerequisites</a></li>
+  </ul></li>
+  <li><a href="#network-connectivity" id="toc-network-connectivity" class="nav-link" data-scroll-target="#network-connectivity">Network &amp; Connectivity</a>
+  <ul class="collapse">
+  <li><a href="#ingress-inbound" id="toc-ingress-inbound" class="nav-link" data-scroll-target="#ingress-inbound">Ingress (Inbound)</a></li>
+  <li><a href="#egress-outbound" id="toc-egress-outbound" class="nav-link" data-scroll-target="#egress-outbound">Egress (Outbound)</a></li>
+  </ul></li>
+  </ul>
+</nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content">
@@ -254,6 +271,16 @@ ul.task-list li input[type="checkbox"] {
 
 <span class="dot">MD</span>  Mat Davis 
 <p><br></p>
+<p>This section details the reference architecture for the IBM Event Endpoint Management (EEM) deployment. The environment is designed to operate within a strict enterprise IT context, utilizing externalized certificate management, static pre-defined hostnames, and isolated traffic routing to satisfy organizational compliance and security standards.</p>
+<section id="logical-topology" class="level2">
+<h2 class="anchored" data-anchor-id="logical-topology">Logical Topology</h2>
+<p>The deployment architecture isolates the public edge from the internal backend brokers, ensuring that all external traffic is inspected and shaped before reaching the core infrastructure. The solution utilizes a separated multi-plane model where management components and data gateways operate distinctly.</p>
+<ul>
+<li><strong>Compute:</strong> Stateless Gateway and Manager Pods running on AWS EKS Worker Nodes.</li>
+<li><strong>Layer 7 Routing:</strong> AWS Application Load Balancer terminating HTTP/HTTPS for control plane UI and APIs.</li>
+<li><strong>Layer 4 Routing:</strong> AWS Network Load Balancer providing TCP/SSL passthrough for the data plane.</li>
+<li><strong>Backend:</strong> Internal Kafka Brokers completely shielded from direct external access.</li>
+</ul>
 <div class="cell" data-layout-align="default">
 <div class="cell-output-display">
 <div>
@@ -275,7 +302,7 @@ ul.task-list li input[type="checkbox"] {
             IngressUI["Ingress: Manager (Console)"]
             IngressAPI[Ingress: Server]
             IngressAdmin[Ingress: Admin]
-            IngressAuth[Ingress: Gateway]
+            IngressAuth[Ingress: Gateway API]
             MgrPods((Manager Pod))
             
             IngressUI --&gt; MgrPods
@@ -285,7 +312,7 @@ ul.task-list li input[type="checkbox"] {
         end
 
         subgraph GatewayGrp[Gateway Group]
-            GwService[Service: LoadBalancer]
+            GwService[Service: Gateway]
             GwPods((Gateway Pod))
             
             GwService --&gt; GwPods
@@ -318,8 +345,195 @@ ul.task-list li input[type="checkbox"] {
 </div>
 </div>
 </div>
+</section>
+<section id="component-matrix" class="level2">
+<h2 class="anchored" data-anchor-id="component-matrix">Component Matrix</h2>
+<p>The solution architecture integrates the following specific components and versions.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Component</th>
+<th style="text-align: left;">Version</th>
+<th style="text-align: left;">Role</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Platform</strong></td>
+<td style="text-align: left;">AWS EKS (v1.24+)</td>
+<td style="text-align: left;">Container Orchestration Platform</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Management Plane</strong></td>
+<td style="text-align: left;">IBM EEM v11.7.x</td>
+<td style="text-align: left;">Kafka API Management &amp; Lifecycle Control</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Data Plane</strong></td>
+<td style="text-align: left;">IBM EEM Gateway v11.7.x</td>
+<td style="text-align: left;">High-performance Kafka Proxy &amp; Policy Engine</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Ingress (L7)</strong></td>
+<td style="text-align: left;">AWS ALB (via LBC)</td>
+<td style="text-align: left;">UI/API Routing and TLS Termination</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Ingress (L4)</strong></td>
+<td style="text-align: left;">AWS NLB</td>
+<td style="text-align: left;">Kafka TCP Passthrough &amp; mTLS Integrity</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Automation</strong></td>
+<td style="text-align: left;">Terraform v1.x</td>
+<td style="text-align: left;">Infrastructure as Code / CI/CD Deployment</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Persistence</strong></td>
+<td style="text-align: left;">AWS EBS (gp2)</td>
+<td style="text-align: left;">Manager Configuration &amp; Database Storage</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="bill-of-materials" class="level2">
+<h2 class="anchored" data-anchor-id="bill-of-materials">Bill of Materials</h2>
+<p>This section outlines the infrastructure required to run the solution. It is specifically structured to align with enterprise IT controls, separating dynamic cluster resources from statically governed corporate services.</p>
+<div class="callout callout-style-default callout-note callout-titled" title="Architectural Alignment">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Architectural Alignment
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>To comply with strict governance around routing and security, the Bill of Materials is separated into <strong>AWS Infrastructure</strong> (raw compute/storage) and <strong>Enterprise IT Prerequisites</strong> (static DNS, internal PKI). EEM is designed to utilize pre-defined hostnames and internal certificates without requiring elevated permissions to modify the broader AWS environment dynamically.</p>
+</div>
+</div>
+<section id="aws-infrastructure-eks-bound" class="level3">
+<h3 class="anchored" data-anchor-id="aws-infrastructure-eks-bound">AWS Infrastructure (EKS Bound)</h3>
+<p>These are the physical AWS resources provisioned for the EKS cluster that will incur standard cloud utilization costs.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">EEM Component</th>
+<th style="text-align: left;">AWS Service</th>
+<th style="text-align: left;">Resource Type / Spec</th>
+<th style="text-align: left;">Purpose</th>
+<th style="text-align: left;">Quantity / Sizing</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Compute</strong></td>
+<td style="text-align: left;">Amazon EC2</td>
+<td style="text-align: left;"><code>m5.2xlarge</code></td>
+<td style="text-align: left;">Hosts EEM Manager and Gateway Pods. Requires moderate CPU for Layer 7 traffic parsing.</td>
+<td style="text-align: left;">3 Nodes <em>(Lab)</em></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Storage</strong></td>
+<td style="text-align: left;">Amazon EBS</td>
+<td style="text-align: left;"><code>gp2</code> Block Storage</td>
+<td style="text-align: left;">Persistent volume for the EEM Manager’s internal PostgreSQL database and state.</td>
+<td style="text-align: left;">50GB</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Network Edge</strong></td>
+<td style="text-align: left;">AWS NLB</td>
+<td style="text-align: left;">Internal, Layer 4</td>
+<td style="text-align: left;">Routes high-throughput Kafka traffic (TCP) directly to the EEM Gateways.</td>
+<td style="text-align: left;">1 per Gateway</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>UI/API Edge</strong></td>
+<td style="text-align: left;">AWS ALB</td>
+<td style="text-align: left;">Internal, Layer 7</td>
+<td style="text-align: left;">Routes HTTP/HTTPS traffic to the EEM Manager UI and Admin API.</td>
+<td style="text-align: left;">1 per Manager</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>IAM</strong></td>
+<td style="text-align: left;">AWS IAM (IRSA)</td>
+<td style="text-align: left;">IAM Role for Service Accounts</td>
+<td style="text-align: left;">Allows EEM pods to securely interact with AWS APIs if necessary.</td>
+<td style="text-align: left;">1 Role</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="enterprise-it-prerequisites" class="level3">
+<h3 class="anchored" data-anchor-id="enterprise-it-prerequisites">Enterprise IT Prerequisites</h3>
+<p>These are the core services provided by central IT. EEM plugs seamlessly into these existing services rather than attempting to provision them dynamically via operators.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Enterprise Service</th>
+<th style="text-align: left;">Internal Equivalent</th>
+<th style="text-align: left;">Purpose &amp; EEM Requirement</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>DNS Resolution</strong></td>
+<td style="text-align: left;">Route53 / Infoblox</td>
+<td style="text-align: left;"><strong>Pre-defined Hostnames:</strong> Static internal DNS records pointing to the AWS ALBs/NLBs. EEM does not require permissions to create Route53 records.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Cert Management</strong></td>
+<td style="text-align: left;">Internal PKI / Venafi</td>
+<td style="text-align: left;"><strong>Pre-defined Certificates:</strong> EEM Gateways require standard TLS certificates. Truist can provision these centrally and mount them as standard Kubernetes Secrets.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Container Registry</strong></td>
+<td style="text-align: left;">JFrog Artifactory / ECR</td>
+<td style="text-align: left;"><strong>Image Hosting:</strong> EEM container images can be mirrored to an internal, scanned registry. EKS nodes do not require public internet access to pull IBM images.</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="network-connectivity" class="level2">
+<h2 class="anchored" data-anchor-id="network-connectivity">Network &amp; Connectivity</h2>
+<p>The environment assumes a strict “Deny by Default” network posture, carefully controlling how external partners access backend data.</p>
+<section id="ingress-inbound" class="level3">
+<h3 class="anchored" data-anchor-id="ingress-inbound">Ingress (Inbound)</h3>
+<ul>
+<li><strong>Manager (Control Plane):</strong> HTTPS Only. TLS is terminated at the AWS Application Load Balancer.</li>
+<li><strong>Gateway (Data Plane):</strong> TCP over mTLS. The AWS NLB performs pure SSL Passthrough, allowing the EEM Gateway pods to directly terminate the mTLS connection for strict partner authentication.</li>
+</ul>
+</section>
+<section id="egress-outbound" class="level3">
+<h3 class="anchored" data-anchor-id="egress-outbound">Egress (Outbound)</h3>
+<p>The EEM environment requires outbound network access to the following destinations:</p>
+<ol type="1">
+<li><strong>Core Kafka Brokers:</strong> Gateway pods require TCP access to the internal backend Kafka clusters (typically ports <code>9092</code> or <code>9093</code>).</li>
+<li><strong>Manager API:</strong> Gateway pods require HTTPS access back to the Manager’s Gateway API for topology syncing and telemetry reporting.</li>
+<li><strong>Image Registry:</strong> HTTPS access to the internal Artifactory or ECR for image pulling during pod initialization.</li>
+</ol>
 
 
+</section>
+</section>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">

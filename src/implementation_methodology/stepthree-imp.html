@@ -605,7 +605,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Because AWS dynamically generates the Network Load Balancer (NLB) hostname during provisioning, we must break the Gateway deployment into three distinct phases. You must provision the Kubernetes Services first to generate the public DNS names, and then inject that exact DNS name into the Gateway Deployment so it can correctly advertise itself to your Kafka clients.</p>
 <p><strong>Phase 1: Configure and Deploy the Service</strong></p>
 <p>Extract the <code>Service</code> definitions from your generated configuration into a new file named <code>gateway-service.yaml</code>. Ensure the <code>type</code> is set to <code>LoadBalancer</code>.</p>
-<p>Because we are using the SNI Hostname routing method, you must explicitly create a separate Kubernetes Service for the bootstrap server and every backend broker you intend to proxy. Each service will generate a unique AWS NLB hostname.</p>
+<p>When exposing the backend brokers through an AWS Network Load Balancer (NLB), you have two architectural choices:</p>
+<ol type="1">
+<li><strong>Multi-Endpoint (SNI Routing):</strong> Create a separate Kubernetes <code>Service</code> for each broker. This provisions multiple NLBs (one per broker) that all listen on port <code>443</code>. Traffic is routed based on the requested SNI hostname.</li>
+<li><strong>Single-Endpoint (Port Routing):</strong> Create a single Kubernetes <code>Service</code> with multiple port definitions. This provisions a single, cost-effective AWS NLB. Traffic for each broker is routed based on the specific external port the client connects to.</li>
+</ol>
+<p>Because we are using the SNI Hostname routing method, you must explicitly create a separate Kubernetes Service for every backend broker you intend to proxy. Each service will generate a unique AWS NLB hostname.</p>
 <p>Here is a configuration mapping three dedicated load balancers for a highly available 3-broker setup, listening externally on <code>443</code> but targeting the safe internal container ports:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="pp">---</span></span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> Service</span></span>

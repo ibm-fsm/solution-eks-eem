@@ -290,9 +290,9 @@ ul.task-list li input[type="checkbox"] {
 <li><strong>Kubernetes Version:</strong> Kubernetes platforms that support the Red Hat Universal Base Images (UBI) containers, versions 1.27 to 1.33.</li>
 </ul></li>
 <li><strong>Software Version:</strong> IBM EEM 11.7.1 (Helm Chart 11.7.1).</li>
-<li><strong>Identity Provider:</strong> OpenID Connect (e.g.&nbsp;Keycloak).</li>
-<li><strong>Ingress Controller:</strong> NGINX or similiar with SSL Passthrough.</li>
-<li><strong>Certificate Management:</strong> cert-manager v1.19.2 or similiar.</li>
+<li><strong>Identity Provider:</strong> OpenID Connect (e.g., Keycloak / Internal IAM).</li>
+<li><strong>Ingress Routing:</strong> AWS Application Load Balancer (ALB) for Layer 7 HTTP/HTTPS traffic, and AWS Network Load Balancer (NLB) for Layer 4 TCP/mTLS Passthrough.</li>
+<li><strong>Certificate Management:</strong> Automated lifecycle provisioning via <strong>cert-manager</strong> utilizing a Custom Issuer integrated with internal Enterprise PKI (e.g., Venafi or private CA).</li>
 </ul>
 
 

@@ -319,7 +319,12 @@ Because AWS dynamically generates the Network Load Balancer (NLB) hostname durin
 
 Extract the `Service` definitions from your generated configuration into a new file named `gateway-service.yaml`. Ensure the `type` is set to `LoadBalancer`. 
 
-Because we are using the SNI Hostname routing method, you must explicitly create a separate Kubernetes Service for the bootstrap server and every backend broker you intend to proxy. Each service will generate a unique AWS NLB hostname. 
+When exposing the backend brokers through an AWS Network Load Balancer (NLB), you have two architectural choices:
+
+1. **Multi-Endpoint (SNI Routing):** Create a separate Kubernetes `Service` for each broker. This provisions multiple NLBs (one per broker) that all listen on port `443`. Traffic is routed based on the requested SNI hostname.
+2. **Single-Endpoint (Port Routing):** Create a single Kubernetes `Service` with multiple port definitions. This provisions a single, cost-effective AWS NLB. Traffic for each broker is routed based on the specific external port the client connects to.
+
+Because we are using the SNI Hostname routing method, you must explicitly create a separate Kubernetes Service for every backend broker you intend to proxy. Each service will generate a unique AWS NLB hostname. 
 
 Here is a configuration mapping three dedicated load balancers for a highly available 3-broker setup, listening externally on `443` but targeting the safe internal container ports:
 

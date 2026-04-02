@@ -29,9 +29,9 @@ The implementation of Event Management in a secure, cloud-native environment (AW
 
 **Environment & Constraints**
 
-*   **Platform:** AWS Elastic Kubernetes Service (EKS).
-    *   **Kubernetes Version:** Kubernetes platforms that support the Red Hat Universal Base Images (UBI) containers, versions 1.27 to 1.33.
-*   **Software Version:** IBM EEM 11.7.1 (Helm Chart 11.7.1).
-*   **Identity Provider:** OpenID Connect (e.g. Keycloak).
-*   **Ingress Controller:** NGINX or similiar with SSL Passthrough.
-*   **Certificate Management:** cert-manager v1.19.2 or similiar.
+* **Platform:** AWS Elastic Kubernetes Service (EKS).
+    * **Kubernetes Version:** Kubernetes platforms that support the Red Hat Universal Base Images (UBI) containers, versions 1.27 to 1.33.
+* **Software Version:** IBM EEM 11.7.1 (Helm Chart 11.7.1).
+* **Identity Provider:** OpenID Connect (e.g., Keycloak / Internal IAM).
+* **Ingress Routing:** AWS Application Load Balancer (ALB) for Layer 7 HTTP/HTTPS traffic, and AWS Network Load Balancer (NLB) for Layer 4 TCP/mTLS Passthrough.
+* **Certificate Management:** Automated lifecycle provisioning via **cert-manager** utilizing a Custom Issuer integrated with internal Enterprise PKI (e.g., Venafi or private CA).

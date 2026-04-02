@@ -124,7 +124,7 @@ If you are attempting to reproduce this environment in a local lab (e.g., k3s) w
 ### 6. Storage Requirements
 The EEM Manager and Portal require persistent storage for their configuration databases.
 
-* **Storage Class:** A valid ReadWriteOnce (RWO) storage class must be available (e.g., `gp3` on EKS or `local-path` on K3s).
+* **Storage Class:** A valid ReadWriteOnce (RWO) storage class must be available (e.g., `gp2` on EKS or `local-path` on K3s).
 * **Capacity:**
     * **Manager:** Minimum 10Gi recommended.
     * **Portal:** Minimum 5Gi recommended.

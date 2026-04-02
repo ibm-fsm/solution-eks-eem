@@ -1,6 +1,6 @@
 variable "eem_api_url" {
   type        = string
-  description = "The Admin URL of the EEM Manager (e.g., https://eem.eem-server-test.local.test/admin)"
+  description = "The Admin URL of the EEM Manager (e.g., https://eem-admin.local.test)"
 }
 
 variable "access_token" {
@@ -12,11 +12,6 @@ variable "access_token" {
 variable "cluster_payload_path" {
   type        = string
   description = "Absolute path to the JSON file defining the Kafka cluster"
-}
-
-variable "topic_payload_dir" {
-  type        = string
-  description = "Absolute path to the directory containing all the topic JSON definitions"
 }
 
 variable "kafka_bootstrap_host" {

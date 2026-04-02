@@ -53,36 +53,6 @@ fi
 
 echo "> Using Cluster ID: $CLUSTERID"
 
-# 2. Register Topics (Idempotent Loop)
-echo "> Submitting Kafka topics..."
-
-# Iterate over all topic JSON files in the specified directory
-for TOPIC_FILE in "$TOPIC_PAYLOAD_DIR"/*.json; do
-    [ -e "$TOPIC_FILE" ] || continue
-    TOPIC_NAME=$(basename "$TOPIC_FILE" .json)
-    echo "  -> Processing $TOPIC_NAME"
-
-    # Inject the CLUSTERID into the topic template
-    sed "s|CLUSTERID|$CLUSTERID|g" "$TOPIC_FILE" > "/tmp/topic-request.json"
-
-    # Try to create the topic, capturing the HTTP code
-    HTTP_STATUS=$(curl -s -k -o /tmp/topic_response.json -w "%{http_code}" -X POST "$EEM_API_URL/eem/eventsources" \
-      -H 'Accept: application/json' \
-      -H 'Content-Type: application/json' \
-      -H "Authorization: Bearer $ACCESS_TOKEN" \
-      -d "@/tmp/topic-request.json")
-
-    if [ "$HTTP_STATUS" == "409" ]; then
-        echo "     Topic $TOPIC_NAME already registered. Skipping."
-    elif [ "$HTTP_STATUS" == "200" ] || [ "$HTTP_STATUS" == "201" ]; then
-        echo "     Successfully registered $TOPIC_NAME."
-    else
-        echo "     ERROR: Failed to register $TOPIC_NAME. HTTP Status: $HTTP_STATUS"
-        cat /tmp/topic_response.json
-        exit 1
-    fi
-done
-
 echo "========================================================================="
 echo " Registration Complete "
 echo "========================================================================="

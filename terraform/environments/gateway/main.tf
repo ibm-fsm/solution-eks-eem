@@ -1,3 +1,17 @@
+terraform {
+  required_providers {
+    kubectl = {
+      source  = "gavinbunney/kubectl"
+      version = ">= 1.14.0"
+    }
+  }
+}
+
+provider "kubernetes" {
+  config_path    = var.kubeconfig_path
+  config_context = var.kube_context
+}
+
 module "eem_manager" {
     source = "../../modules/eem-gateway"
     namespace = var.namespace

@@ -1,0 +1,5 @@
+namespace = "ibm-eem-demo"
+gateway_group = "tf-group"
+gateway_id = "tf-gateway"
+backend_url = "https://eem-gateway-demo.local.test"
+kube_context = "arn:aws:eks:us-east-1:000000000000:cluster/demo-eem-pilot"

@@ -1,0 +1,4 @@
+eem_api_url      = "https://<YOUR_ADMIN_API_URL>"
+eem_access_token = "20caa35d-14ed-4b1e-bf2f-341ec3c1b105"
+cluster_id = "c55f6b37-410a-4363-988b-ef49075d8cf4"
+data_products_dir = "./data-products/"

@@ -1,0 +1,9 @@
+{
+    "eventSourceId": "EVENTSOURCEID",
+    "alias": "TRADESIGPRO",
+    "name": "Trade Signals Producer",
+    "controls": [],
+    "hidden": false,
+    "allowSubscriptions": true,
+    "gatewayGroups": [ "tf-group" ]
+}

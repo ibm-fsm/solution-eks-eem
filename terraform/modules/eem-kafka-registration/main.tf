@@ -40,7 +40,6 @@ resource "null_resource" "register_kafka_cluster" {
   # or add/remove/edit any of the topic JSON files.
   triggers = {
     cluster_hash = md5(local.rendered_cluster_json)
-    topics_hash  = sha256(join("", [for f in fileset(var.topic_payload_dir, "*.json") : filemd5("${var.topic_payload_dir}/${f}")]))
   }
 
   depends_on = [local_file.rendered_cluster_payload]
@@ -53,7 +52,6 @@ resource "null_resource" "register_kafka_cluster" {
       EEM_API_URL          = var.eem_api_url
       ACCESS_TOKEN         = var.access_token
       CLUSTER_PAYLOAD_PATH = local.rendered_file_path
-      TOPIC_PAYLOAD_DIR    = var.topic_payload_dir
     }
   }
 }

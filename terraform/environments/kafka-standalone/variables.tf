@@ -14,11 +14,6 @@ variable "cluster_payload_path" {
   description = "Absolute path to the JSON file defining the Kafka cluster"
 }
 
-variable "topic_payload_dir" {
-  type        = string
-  description = "Absolute path to the directory containing all the topic JSON definitions"
-}
-
 variable "kafka_bootstrap_host" {
   type        = string
   description = "The Kafka bootstrap server hostname and port (e.g., kafka.corp.internal:9093)"

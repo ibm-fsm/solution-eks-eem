@@ -29,3 +29,14 @@ variable "backend_url" {
   type        = string
   description = "The gateway endpoint on the EEM Manager (e.g., https://eem-gateway.<dns>). The Gateway pod uses this Control Plane URL to authenticate and fetch its configuration."
 }
+
+variable "kubeconfig_path" {
+  type        = string
+  description = "Path to the Kubernetes config file."
+  default = "~/.kube/config"
+}
+
+variable "kube_context" {
+  type        = string
+  description = "Kubernetes context to use."
+}
